@@ -41,4 +41,10 @@ func main() {
 
 	// Clean-up.
 	cmd.Wait()
+
+	Put("test", 0.1)
+	points := Get("test")
+	for _, p := range points {
+		fmt.Printf("timestamp: %v, values: %v\n", p.Timestamp, p.Value)
+	}
 }
