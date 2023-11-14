@@ -17,6 +17,8 @@ func e(err error) {
 }
 
 func main() {
+	// Command execution.
+
 	// Query to execute upon.
 	var query string
 
@@ -43,12 +45,7 @@ func main() {
 	// Clean-up.
 	cmd.Wait()
 
-	// Old implementation with tstorage.
-
-	// points := Get("test")
-	// for _, p := range points {
-	// 	fmt.Printf("timestamp: %v, values: %v\n", p.Timestamp, p.Value)
-	// }
+	// Testing for storage.
 
 	then := time.Now()
 
