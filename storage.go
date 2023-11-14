@@ -20,14 +20,8 @@ type result struct {
 	Value interface{}
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//
-// Variables
-//
-////////////////////////////////////////////////////////////////////////////////
-
 // Collection of results.
-var results []result
+type Results []result
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -37,8 +31,8 @@ var results []result
 
 // Get a result based on a timestamp. Returns the first result encountered
 // which occurs after the provided time.
-func Get(time time.Time) result {
-	for _, result := range results {
+func (r *Results) Get(time time.Time) result {
+	for _, result := range *r {
 		if result.Time.Compare(time) >= 0 {
 			// We found a time to return.
 			return result
@@ -49,9 +43,14 @@ func Get(time time.Time) result {
 	return result{}
 }
 
+// Get a specific indexed result.
+func (r *Results) GetI(i int) result {
+	return (*r)[i]
+}
+
 // Gets results based on a start and end timestamp.
-func GetRange(startTime time.Time, endTime time.Time) (found []result) {
-	for _, result := range results {
+func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []result) {
+	for _, result := range *r {
 		if result.Time.Compare(startTime) >= 0 {
 			found = append(found, result)
 		}
@@ -65,8 +64,8 @@ func GetRange(startTime time.Time, endTime time.Time) (found []result) {
 }
 
 // Put a new result.
-func Put[T interface{}](value T) T {
-	results = append(results, result{
+func (r *Results) Put(value interface{}) interface{} {
+	*r = append(*r, result{
 		Time:  time.Now(),
 		Value: value,
 	})
@@ -75,8 +74,8 @@ func Put[T interface{}](value T) T {
 }
 
 // Show all currently stored results.
-func Show() {
-	for _, result := range results {
+func (r *Results) Show() {
+	for _, result := range *r {
 		fmt.Printf("Time: %v, Value: %v\n", result.Time, result.Value)
 	}
 }

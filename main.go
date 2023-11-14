@@ -50,18 +50,19 @@ func main() {
 	then := time.Now()
 
 	fmt.Println("Inserting entries ...")
-	Put[string]("test")
-	Put[string]("herp")
-	Put[string]("derp")
-	Put[float64](0.1)
-	Put[float64](0.2)
-	Put[float64](0.3)
+	results := Results{}
+	results.Put("test")
+	results.Put("herp")
+	results.Put("derp")
+	results.Put(0.1)
+	results.Put(0.2)
+	results.Put(0.3)
 
 	fmt.Println("Results are:")
-	Show()
+	results.Show()
 
 	fmt.Println("Querying entries ...")
-	fmt.Println(Get(then))                       // Should return the first entry.
-	fmt.Println(Get(time.Now()))                 // Should return a nil entry.
-	fmt.Println(len(GetRange(then, time.Now()))) // Should return all entries.
+	fmt.Println(results.Get(then))                       // Should return the first entry.
+	fmt.Println(results.Get(time.Now()))                 // Should return a nil entry.
+	fmt.Println(len(results.GetRange(then, time.Now()))) // Should return all entries.
 }
