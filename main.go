@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os/exec"
+	"time"
 )
 
 // General error manager.
@@ -42,9 +43,28 @@ func main() {
 	// Clean-up.
 	cmd.Wait()
 
-	Put("test", 0.1)
-	points := Get("test")
-	for _, p := range points {
-		fmt.Printf("timestamp: %v, values: %v\n", p.Timestamp, p.Value)
-	}
+	// Old implementation with tstorage.
+
+	// points := Get("test")
+	// for _, p := range points {
+	// 	fmt.Printf("timestamp: %v, values: %v\n", p.Timestamp, p.Value)
+	// }
+
+	then := time.Now()
+
+	fmt.Println("Inserting entries ...")
+	Put[string]("test")
+	Put[string]("herp")
+	Put[string]("derp")
+	Put[float64](0.1)
+	Put[float64](0.2)
+	Put[float64](0.3)
+
+	fmt.Println("Results are:")
+	Show()
+
+	fmt.Println("Querying entries ...")
+	fmt.Println(Get(then))                       // Should return the first entry.
+	fmt.Println(Get(time.Now()))                 // Should return a nil entry.
+	fmt.Println(len(GetRange(then, time.Now()))) // Should return all entries.
 }
