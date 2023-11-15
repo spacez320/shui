@@ -43,11 +43,6 @@ func (r *Results) Get(time time.Time) result {
 	return result{}
 }
 
-// Get a specific indexed result.
-func (r *Results) GetI(i int) result {
-	return (*r)[i]
-}
-
 // Gets results based on a start and end timestamp.
 func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []result) {
 	for _, result := range *r {
