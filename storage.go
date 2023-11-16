@@ -74,3 +74,20 @@ func (r *Results) Show() {
 		fmt.Printf("Time: %v, Value: %v\n", result.Time, result.Value)
 	}
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// RPC
+//
+////////////////////////////////////////////////////////////////////////////////
+
+type ArgsRPC struct{}
+
+type ResultsRPC struct {
+	Results *Results
+}
+
+func (r *Results) GetAllRPC(args *ArgsRPC, results *ResultsRPC) error {
+	results.Results = r
+	return nil
+}
