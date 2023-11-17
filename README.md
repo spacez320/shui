@@ -38,7 +38,7 @@ cryptarch -q 'whoami'
 # Execute `uptime` continuously, printing results to the console.
 cryptarch -q 'uptime' -t -1
 
-# Do the same thing, but silently in the background, and retrieving results.
+# Do the same thing, but silently in the background. Then retrieve results.
 cryptarch -q 'uptime' -s -t -1 &
 cryptarch -m 1
 ```
