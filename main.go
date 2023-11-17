@@ -2,52 +2,59 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
-	"os/exec"
+)
+
+type mode_ int
+
+const (
+	mode_query mode_ = iota
+	mode_read
+)
+
+var (
+	attempts int     // Number of attempts to execute the query.
+	delay    int     // Delay between queries.
+	mode     int     // Mode to execute in.
+	port     string  // Port for RPC.
+	query    string  // Query to execute upon.
+	results  Results // Stored results.
+	silent   bool    // Whether or not to be quiet.
+
+	logger = log.Default() // Logging system.
 )
 
 // General error manager.
 func e(err error) {
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 }
 
 func main() {
-	var (
-		attempts int     // Number of attempts to execute the query.
-		query    string  // Query to execute upon.
-		results  Results // Stored results.
-	)
-
 	// Define arguments.
-	flag.IntVar(&attempts, "t", 1, "Number of query executions.")
+	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
+	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
+	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
+	flag.StringVar(&port, "p", "12345", "Port for RPC.")
+	flag.IntVar(&mode, "m", int(mode_query), "Mode to execute in.")
 	flag.StringVar(&query, "q", "whoami", "Query to execute.")
 	flag.Parse()
 
-	for i := 0; i < attempts; i++ {
-		// Prepare query execution.
-		fmt.Printf("Executing query: '%s' ...\n", query)
-		cmd := exec.Command(query)
-		stdout, stdout_err := cmd.StdoutPipe()
-		e(stdout_err)
-
-		// Execute the query.
-		cmd_err := cmd.Start()
-		e(cmd_err)
-
-		// Interpret results.
-		cmd_output, cmd_output_err := io.ReadAll(stdout)
-		e(cmd_output_err)
-		results.Put(cmd_output)
-		fmt.Printf("Result is: \n%s\n", cmd_output)
-
-		// Clean-up.
-		cmd.Wait()
+	// Quiet logging if specified.
+	if silent {
+		logger.SetOutput(ioutil.Discard)
 	}
 
-	// Print out results for debugging.
-	fmt.Printf("Results are: %v\n", results)
+	switch {
+	case mode == int(mode_query):
+		logger.Println("Executing in query mode.")
+		modeQuery()
+	case mode == int(mode_read):
+		logger.Println("Executing in read mode.")
+		modeRead()
+	default:
+		logger.Fatalf("Invalid mode: %v", mode)
+	}
 }
