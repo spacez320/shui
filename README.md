@@ -31,12 +31,17 @@ Cryptarch executes in one of two modes.
 
 ### Examples
 
+> The examples below have been tested on `GNU bash, version 5.2.15(1)-release`.
+
 ```sh
 # Execute `whoami` once, printing results to the console.
 cryptarch -q 'whoami'
 
 # Execute `uptime` continuously, printing results to the console.
 cryptarch -q 'uptime' -t -1
+
+# Get the size of an NVME used space.
+cryptarch -q 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\'''
 
 # Do the same thing, but silently in the background. Then retrieve results.
 cryptarch -q 'uptime' -s -t -1 &
