@@ -17,8 +17,8 @@ Usage of ./cryptarch:
         Mode to execute in.
   -p string
         Port for RPC. (default "12345")
-  -q string
-        Query to execute. (default "whoami")
+  -q value
+        Query to execute. (default 0xc0000144e0)
   -s    Don't output anything to a console.
   -t int
         Number of query executions. -1 for continuous. (default 1)
