@@ -9,10 +9,31 @@ import (
 	"time"
 )
 
+// Entrypoint for 'query' mode.
 func modeQuery() {
+	var (
+		doneQuery = make(chan bool, len(queries))
+	)
+
 	// Start the RPC server.
 	initServer()
 
+	// Execute the queries.
+	for _, query := range queries {
+		go runQuery(query, doneQuery)
+	}
+
+	// Wait for the queries to finish.
+	for i := 0; i < len(queries); i++ {
+		<-doneQuery
+	}
+
+	// Print out results for debugging.
+	results.Show()
+}
+
+// Executes a query.
+func runQuery(query string, doneQuery chan bool) {
 	// This loop executes as long as attempts has not been reached or
 	// indefinitely if attempts is less than zero.
 	for i := 0; attempts < 0 || i < attempts; i++ {
@@ -52,6 +73,5 @@ func modeQuery() {
 		}
 	}
 
-	// Print out results for debugging.
-	logger.Printf("Results are: %v\n", results)
+	doneQuery <- true // Signals that this query is finished.
 }
