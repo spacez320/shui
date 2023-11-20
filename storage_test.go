@@ -33,7 +33,6 @@ func TestGet(t *testing.T) {
 	// It gets a result matching the time.
 	got := results.Get(testTime)
 	expected := results[0]
-
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Got: %v Expected: %v\n", got, expected)
 	}
@@ -41,7 +40,6 @@ func TestGet(t *testing.T) {
 	// It gets no results if a time does not match.
 	got = results.Get(testTime.Add(time.Second * 15))
 	expected = result{}
-
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Got: %v Expected: %v\n", got, expected)
 	}
@@ -53,7 +51,6 @@ func TestGetRange(t *testing.T) {
 	// It gets results for exact matches on a time range.
 	got := results.GetRange(testTime, testTime.Add(time.Second*30))
 	expected := results
-
 	for i, result := range got {
 		if !reflect.DeepEqual(result, expected[i]) {
 			t.Errorf("Got: %v Expected: %v\n", got, expected)
@@ -63,7 +60,6 @@ func TestGetRange(t *testing.T) {
 
 	// It gets results for extended matches on a time range.
 	got = results.GetRange(testTime.Add(-time.Second*30), testTime.Add(time.Second*60))
-
 	for i, result := range got {
 		if !reflect.DeepEqual(result, expected[i]) {
 			t.Errorf("Got: %v Expected: %v\n", got, expected)
@@ -73,7 +69,6 @@ func TestGetRange(t *testing.T) {
 
 	// It returns a single result if the time range is restricted.
 	got = results.GetRange(testTime, testTime)
-
 	if len(got) != 1 || !reflect.DeepEqual(got[0], expected[0]) {
 		t.Errorf("Got: %v Expected: %v\n", got, expected)
 	}
@@ -84,7 +79,6 @@ func TestPut(t *testing.T) {
 
 	// It successfully appends a result.
 	results.Put("fizz")
-
 	if len(results) != 3 && results[2].Value != "fizz" {
 		t.Errorf("Got: %v\n", results)
 	}
@@ -95,11 +89,9 @@ func TestPutC(t *testing.T) {
 
 	// It successfully appends a compound result.
 	results.PutC("fizz", 3)
-
 	expected := make([]interface{}, 0)
 	expected = append(expected, "fizz")
 	expected = append(expected, 3)
-
 	for i, result := range results[2].Values {
 		if result != expected[i] {
 			t.Errorf("Got: %v\n", results)

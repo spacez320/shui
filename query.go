@@ -6,7 +6,11 @@ package main
 import (
 	"io"
 	"os/exec"
+	"strconv"
+	"strings"
+	"text/scanner"
 	"time"
+	"unicode"
 )
 
 // Entrypoint for 'query' mode.
@@ -30,6 +34,43 @@ func modeQuery() {
 
 	// Print out results for debugging.
 	results.Show()
+}
+
+// Parses a query result into compound values.
+func parseQueryOutput(output string) (parsed []interface{}) {
+	var (
+		s    scanner.Scanner // Scanner for tokenization.
+		next string          // Next token to consider.
+	)
+
+	s.Init(strings.NewReader(output))
+	s.IsIdentRune = func(r rune, i int) bool {
+		// Separate all tokens exclusively by whitespace.
+		return !unicode.IsSpace(r)
+	}
+
+	for token := s.Scan(); token != scanner.EOF; token = s.Scan() {
+		next = s.TokenText()
+
+		// Attempt to parse this value as an integer.
+		nextInt, err := strconv.ParseInt(next, 10, 0)
+		if err == nil {
+			parsed = append(parsed, nextInt)
+			continue
+		}
+
+		// Attempt to parse this value as a float.
+		nextFloat, err := strconv.ParseFloat(next, 10)
+		if err == nil {
+			parsed = append(parsed, nextFloat)
+			continue
+		}
+
+		// Everything else has failed--just pass it as a string.
+		parsed = append(parsed, next)
+	}
+
+	return
 }
 
 // Executes a query.
@@ -61,7 +102,8 @@ func runQuery(query string, doneQuery chan bool) {
 		// Interpret results.
 		cmd_output, cmd_output_err := io.ReadAll(stdout)
 		e(cmd_output_err)
-		results.Put(cmd_output)
+		// results.Put(cmd_output) // TODO Preserving, pending the removal of simple results.
+		results.PutC(parseQueryOutput(string(cmd_output))...)
 		logger.Printf("Result is: \n%s\n", cmd_output)
 
 		// Clean-up.
