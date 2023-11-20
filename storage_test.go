@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -14,12 +15,14 @@ func testStorage() Results {
 
 	return Results{
 		result{
-			Time:  testTime,
-			Value: "foo",
+			Time:   testTime,
+			Value:  "foo",
+			Values: nil,
 		},
 		result{
-			Time:  testTime.Add(time.Second * 30),
-			Value: "bar",
+			Time:   testTime.Add(time.Second * 30),
+			Value:  "bar",
+			Values: nil,
 		},
 	}
 }
@@ -31,32 +34,15 @@ func TestGet(t *testing.T) {
 	got := results.Get(testTime)
 	expected := results[0]
 
-	if got != expected {
+	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Got: %v Expected: %v\n", got, expected)
 	}
 
-	// It gets no results if a time is far advanced.
-	got = results.Get(testTime.Add(time.Second * 60))
+	// It gets no results if a time does not match.
+	got = results.Get(testTime.Add(time.Second * 15))
 	expected = result{}
 
-	if got != expected {
-		t.Errorf("Got: %v Expected: %v\n", got, expected)
-	}
-
-	// It gets the first result if the time is before the first result.
-	got = results.Get(testTime.Add(-time.Second * 60))
-	expected = results[0]
-
-	if got != expected {
-		t.Errorf("Got: %v Expected: %v\n", got, expected)
-	}
-
-	// It gets the second result if the time is between the first and second
-	// results.
-	got = results.Get(testTime.Add(time.Second * 15))
-	expected = results[1]
-
-	if got != expected {
+	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Got: %v Expected: %v\n", got, expected)
 	}
 }
@@ -69,7 +55,7 @@ func TestGetRange(t *testing.T) {
 	expected := results
 
 	for i, result := range got {
-		if result != expected[i] {
+		if !reflect.DeepEqual(result, expected[i]) {
 			t.Errorf("Got: %v Expected: %v\n", got, expected)
 			break
 		}
@@ -79,7 +65,7 @@ func TestGetRange(t *testing.T) {
 	got = results.GetRange(testTime.Add(-time.Second*30), testTime.Add(time.Second*60))
 
 	for i, result := range got {
-		if result != expected[i] {
+		if !reflect.DeepEqual(result, expected[i]) {
 			t.Errorf("Got: %v Expected: %v\n", got, expected)
 			break
 		}
@@ -88,7 +74,7 @@ func TestGetRange(t *testing.T) {
 	// It returns a single result if the time range is restricted.
 	got = results.GetRange(testTime, testTime)
 
-	if len(got) != 1 && got[0] != expected[0] {
+	if len(got) != 1 || !reflect.DeepEqual(got[0], expected[0]) {
 		t.Errorf("Got: %v Expected: %v\n", got, expected)
 	}
 }
@@ -101,5 +87,22 @@ func TestPut(t *testing.T) {
 
 	if len(results) != 3 && results[2].Value != "fizz" {
 		t.Errorf("Got: %v\n", results)
+	}
+}
+
+func TestPutC(t *testing.T) {
+	results := testStorage()
+
+	// It successfully appends a compound result.
+	results.PutC("fizz", 3)
+
+	expected := make([]interface{}, 0)
+	expected = append(expected, "fizz")
+	expected = append(expected, 3)
+
+	for i, result := range results[2].Values {
+		if result != expected[i] {
+			t.Errorf("Got: %v\n", results)
+		}
 	}
 }
