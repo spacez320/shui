@@ -16,8 +16,9 @@ import (
 
 // Individual result.
 type result struct {
-	Time  time.Time
-	Value interface{}
+	Time   time.Time
+	Value  interface{}
+	Values []interface{}
 }
 
 // Collection of results.
@@ -29,12 +30,11 @@ type Results []result
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-// Get a result based on a timestamp. Returns the first result encountered
-// which occurs after the provided time.
+// Get a result based on a timestamp.
 func (r *Results) Get(time time.Time) result {
 	for _, result := range *r {
-		if result.Time.Compare(time) >= 0 {
-			// We found a time to return.
+		if result.Time.Compare(time) == 0 {
+			// We found a result to return.
 			return result
 		}
 	}
@@ -47,11 +47,13 @@ func (r *Results) Get(time time.Time) result {
 func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []result) {
 	for _, result := range *r {
 		if result.Time.Compare(startTime) >= 0 {
-			found = append(found, result)
-		}
-
-		if result.Time.Compare(endTime) > 0 {
-			break
+			if result.Time.Compare(endTime) > 0 {
+				// Break out of the loop if we've exhausted the upper bounds of the
+				// range.
+				break
+			} else {
+				found = append(found, result)
+			}
 		}
 	}
 
@@ -61,17 +63,29 @@ func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []resu
 // Put a new result.
 func (r *Results) Put(value interface{}) interface{} {
 	*r = append(*r, result{
-		Time:  time.Now(),
-		Value: value,
+		Time:   time.Now(),
+		Value:  value,
+		Values: nil,
 	})
 
 	return value
 }
 
+// Put a new compound result.
+func (r *Results) PutC(values ...interface{}) []interface{} {
+	*r = append(*r, result{
+		Time:   time.Now(),
+		Value:  nil,
+		Values: values,
+	})
+
+	return values
+}
+
 // Show all currently stored results.
 func (r *Results) Show() {
 	for _, result := range *r {
-		fmt.Printf("Time: %v, Value: %v\n", result.Time, result.Value)
+		fmt.Printf("Time: %v, Value: %v, Values: %v\n", result.Time, result.Value, result.Values)
 	}
 }
 

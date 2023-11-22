@@ -69,8 +69,8 @@ func main() {
 	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
 	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
-	flag.StringVar(&port, "p", "12345", "Port for RPC.")
 	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
+	flag.StringVar(&port, "p", "12345", "Port for RPC.")
 	flag.Var(&queries, "q", "Query to execute.")
 	flag.Parse()
 
