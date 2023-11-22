@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"os/exec"
 	"strconv"
@@ -11,6 +12,8 @@ import (
 	"text/scanner"
 	"time"
 	"unicode"
+
+	"golang.org/x/exp/slog"
 )
 
 // Entrypoint for 'query' mode.
@@ -79,7 +82,7 @@ func runQuery(query string, doneQuery chan bool) {
 	// indefinitely if attempts is less than zero.
 	for i := 0; attempts < 0 || i < attempts; i++ {
 		// Prepare query execution.
-		logger.Printf("Executing query: '%s' ...\n", query)
+		slog.Debug("Executing query: '%s' ...\n", query)
 		cmd := exec.Command("bash", "-c", query)
 
 		// Set-up pipes for command output.
@@ -96,7 +99,7 @@ func runQuery(query string, doneQuery chan bool) {
 		cmd_stderr_output, cmd_stderr_output_err := io.ReadAll(stderr)
 		e(cmd_stderr_output_err)
 		if len(cmd_stderr_output) != 0 {
-			logger.Fatalf("Error is: \n%s\n", cmd_stderr_output)
+			slog.Error(fmt.Sprintf("Error is: \n%s\n", cmd_stderr_output))
 		}
 
 		// Interpret results.
@@ -104,7 +107,7 @@ func runQuery(query string, doneQuery chan bool) {
 		e(cmd_output_err)
 		// results.Put(cmd_output) // TODO Preserving, pending the removal of simple results.
 		results.PutC(parseQueryOutput(string(cmd_output))...)
-		logger.Printf("Result is: \n%s\n", cmd_output)
+		slog.Debug(fmt.Sprintf("Result is: \n%s\n", cmd_output))
 
 		// Clean-up.
 		cmd.Wait()

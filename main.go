@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+
+	"golang.org/x/exp/slog"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -42,13 +45,20 @@ const (
 var (
 	attempts int      // Number of attempts to execute the query.
 	delay    int      // Delay between queries.
+	logLevel string   // Log level.
 	mode     int      // Mode to execute in.
 	port     string   // Port for RPC.
 	queries  queries_ // Queries to execute.
 	results  Results  // Stored results.
 	silent   bool     // Whether or not to be quiet.
 
-	logger = log.Default() // Logging system.
+	logger                 = log.Default() // Logging system.
+	logLevelStrToSlogLevel = map[string]slog.Level{
+		"debug": slog.LevelDebug,
+		"info":  slog.LevelInfo,
+		"warn":  slog.LevelWarn,
+		"error": slog.LevelError,
+	} // Log levels acceptable as a flag.
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,33 +70,43 @@ var (
 // General error manager.
 func e(err error) {
 	if err != nil {
-		logger.Fatal(err)
+		slog.Error(err.Error())
 	}
 }
 
 func main() {
 	// Define arguments.
+
 	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
 	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
 	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
+	flag.StringVar(&logLevel, "l", "error", "Log level.")
 	flag.StringVar(&port, "p", "12345", "Port for RPC.")
 	flag.Var(&queries, "q", "Query to execute.")
 	flag.Parse()
 
-	// Quiet logging if specified.
+	// Set-up logging.
+
 	if silent {
 		logger.SetOutput(ioutil.Discard)
 	}
 
+	slog.SetDefault(slog.New(slog.NewTextHandler(
+		os.Stdout,
+		&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+	)))
+
+	// Execute the specified mode.
+
 	switch {
 	case mode == int(MODE_QUERY):
-		logger.Println("Executing in query mode.")
+		slog.Debug("Executing in query mode.")
 		modeQuery()
 	case mode == int(MODE_READ):
-		logger.Println("Executing in read mode.")
+		slog.Debug("Executing in read mode.")
 		modeRead()
 	default:
-		logger.Fatalf("Invalid mode: %v", mode)
+		slog.Debug(fmt.Sprintf("Invalid mode: %v", mode))
 	}
 }
