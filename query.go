@@ -17,10 +17,8 @@ import (
 )
 
 // Entrypoint for 'query' mode.
-func modeQuery() {
-	var (
-		doneQuery = make(chan bool, len(queries))
-	)
+func modeQuery() (done chan int) {
+	var doneQuery = make(chan bool, len(queries)) // Signals query completion.
 
 	// Start the RPC server.
 	initServer()
@@ -30,13 +28,17 @@ func modeQuery() {
 		go runQuery(query, doneQuery)
 	}
 
-	// Wait for the queries to finish.
-	for i := 0; i < len(queries); i++ {
-		<-doneQuery
-	}
+	go func() {
+		// Wait for the queries to finish.
+		for i := 0; i < len(queries); i++ {
+			<-doneQuery
+		}
 
-	// Print out results for debugging.
-	results.Show()
+		// Signal overall completion.
+		done <- 1
+	}()
+
+	return
 }
 
 // Parses a query result into compound values.
@@ -82,7 +84,7 @@ func runQuery(query string, doneQuery chan bool) {
 	// indefinitely if attempts is less than zero.
 	for i := 0; attempts < 0 || i < attempts; i++ {
 		// Prepare query execution.
-		slog.Debug("Executing query: '%s' ...\n", query)
+		slog.Debug(fmt.Sprintf("Executing query: '%s' ...\n", query))
 		cmd := exec.Command("bash", "-c", query)
 
 		// Set-up pipes for command output.

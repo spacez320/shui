@@ -93,26 +93,28 @@ func main() {
 	flag.Parse()
 
 	// Set-up logging.
-
 	if silent {
+		// Silence all output.
 		logger.SetOutput(ioutil.Discard)
+	} else {
+		slog.SetDefault(slog.New(slog.NewTextHandler(
+			os.Stdout,
+			&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+		)))
 	}
-
-	slog.SetDefault(slog.New(slog.NewTextHandler(
-		os.Stdout,
-		&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
-	)))
 
 	// Execute the specified mode.
 
 	switch {
 	case mode == int(MODE_QUERY):
 		slog.Debug("Executing in query mode.")
-		modeQuery()
+		done := modeQuery()
+		resultsModeRaw()
+		<-done
 	case mode == int(MODE_READ):
 		slog.Debug("Executing in read mode.")
 		modeRead()
 	default:
-		slog.Debug(fmt.Sprintf("Invalid mode: %v", mode))
+		slog.Error(fmt.Sprintf("Invalid mode: %v", mode))
 	}
 }
