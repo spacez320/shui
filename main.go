@@ -31,6 +31,9 @@ func (q *queries_) Set(query string) error {
 	return nil
 }
 
+// Represents the result mode value.
+type resultMode_ int
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Variables
@@ -38,19 +41,21 @@ func (q *queries_) Set(query string) error {
 ////////////////////////////////////////////////////////////////////////////////
 
 const (
-	MODE_QUERY mode_ = iota // For running in 'query' mode.
-	MODE_READ               // For running in 'read' mode.
+	MODE_QUERY      mode_       = iota // For running in 'query' mode.
+	MODE_READ                          // For running in 'read' mode.
+	RESULT_MODE_RAW resultMode_ = iota // For running in 'raw' result mode.
 )
 
 var (
-	attempts int      // Number of attempts to execute the query.
-	delay    int      // Delay between queries.
-	logLevel string   // Log level.
-	mode     int      // Mode to execute in.
-	port     string   // Port for RPC.
-	queries  queries_ // Queries to execute.
-	results  Results  // Stored results.
-	silent   bool     // Whether or not to be quiet.
+	attempts   int      // Number of attempts to execute the query.
+	delay      int      // Delay between queries.
+	logLevel   string   // Log level.
+	mode       int      // Mode to execute in.
+	port       string   // Port for RPC.
+	queries    queries_ // Queries to execute.
+	resultMode int      // Result mode to display.
+	results    Results  // Stored results.
+	silent     bool     // Whether or not to be quiet.
 
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
@@ -82,6 +87,7 @@ func main() {
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
 	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
 	flag.StringVar(&logLevel, "l", "error", "Log level.")
+	flag.IntVar(&resultMode, "r", int(RESULT_MODE_RAW), "Result mode to display.")
 	flag.StringVar(&port, "p", "12345", "Port for RPC.")
 	flag.Var(&queries, "q", "Query to execute.")
 	flag.Parse()
