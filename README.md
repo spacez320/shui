@@ -13,12 +13,16 @@ Usage
 Usage of ./cryptarch:
   -d int
         Delay between queries (seconds). (default 3)
+  -l string
+        Log level. (default "error")
   -m int
         Mode to execute in.
   -p string
         Port for RPC. (default "12345")
   -q value
-        Query to execute. (default 0xc0000144e0)
+        Query to execute. (default 0xc0000145f0)
+  -r int
+        Result mode to display. (default 2)
   -s    Don't output anything to a console.
   -t int
         Number of query executions. -1 for continuous. (default 1)
