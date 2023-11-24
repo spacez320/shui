@@ -7,17 +7,13 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"strconv"
-	"strings"
-	"text/scanner"
 	"time"
-	"unicode"
 
 	"golang.org/x/exp/slog"
 )
 
 // Entrypoint for 'query' mode.
-func modeQuery() (done chan int) {
+func Query() (done chan int) {
 	var doneQuery = make(chan bool, len(queries)) // Signals query completion.
 
 	// Start the RPC server.
@@ -37,43 +33,6 @@ func modeQuery() (done chan int) {
 		// Signal overall completion.
 		done <- 1
 	}()
-
-	return
-}
-
-// Parses a query result into compound values.
-func parseQueryOutput(output string) (parsed []interface{}) {
-	var (
-		s    scanner.Scanner // Scanner for tokenization.
-		next string          // Next token to consider.
-	)
-
-	s.Init(strings.NewReader(output))
-	s.IsIdentRune = func(r rune, i int) bool {
-		// Separate all tokens exclusively by whitespace.
-		return !unicode.IsSpace(r)
-	}
-
-	for token := s.Scan(); token != scanner.EOF; token = s.Scan() {
-		next = s.TokenText()
-
-		// Attempt to parse this value as an integer.
-		nextInt, err := strconv.ParseInt(next, 10, 0)
-		if err == nil {
-			parsed = append(parsed, nextInt)
-			continue
-		}
-
-		// Attempt to parse this value as a float.
-		nextFloat, err := strconv.ParseFloat(next, 10)
-		if err == nil {
-			parsed = append(parsed, nextFloat)
-			continue
-		}
-
-		// Everything else has failed--just pass it as a string.
-		parsed = append(parsed, next)
-	}
 
 	return
 }
@@ -107,8 +66,7 @@ func runQuery(query string, doneQuery chan bool) {
 		// Interpret results.
 		cmd_output, cmd_output_err := io.ReadAll(stdout)
 		e(cmd_output_err)
-		// results.Put(cmd_output) // TODO Preserving, pending the removal of simple results.
-		results.PutC(parseQueryOutput(string(cmd_output))...)
+		AddResult(string(cmd_output))
 		slog.Debug(fmt.Sprintf("Result is: \n%s\n", cmd_output))
 
 		// Clean-up.

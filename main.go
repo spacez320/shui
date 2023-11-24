@@ -54,7 +54,6 @@ var (
 	port       string   // Port for RPC.
 	queries    queries_ // Queries to execute.
 	resultMode int      // Result mode to display.
-	results    Results  // Stored results.
 	silent     bool     // Whether or not to be quiet.
 
 	logger                 = log.Default() // Logging system.
@@ -93,6 +92,7 @@ func main() {
 	flag.Parse()
 
 	// Set-up logging.
+
 	if silent {
 		// Silence all output.
 		logger.SetOutput(ioutil.Discard)
@@ -105,16 +105,17 @@ func main() {
 
 	// Execute the specified mode.
 
+	done := make(chan int)
 	switch {
 	case mode == int(MODE_QUERY):
 		slog.Debug("Executing in query mode.")
-		done := modeQuery()
-		resultsModeRaw()
-		<-done
+		done = Query()
+		RawResults()
 	case mode == int(MODE_READ):
 		slog.Debug("Executing in read mode.")
-		modeRead()
+		done = Read()
 	default:
 		slog.Error(fmt.Sprintf("Invalid mode: %v", mode))
 	}
+	<-done
 }
