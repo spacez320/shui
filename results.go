@@ -8,25 +8,39 @@ import (
 	"strconv"
 	"strings"
 	"text/scanner"
-	"time"
 	"unicode"
 
 	"github.com/rivo/tview"
 )
 
 var (
-	app         *tview.Application
-	resultsView *tview.TextView
-	results     Results // Stored results.
+	app         *tview.Application // Application for display.
+	logsView    *tview.TextView    // View for miscellaneous log output.
+	resultsView *tview.TextView    // View for results.
+	results     Results            // Stored results.
 )
 
+// Initializes the results display.
 func init() {
 	app = tview.NewApplication()
 
-	resultsView = tview.NewTextView().
-		SetChangedFunc(func() {
+	resultsView = tview.NewTextView().SetChangedFunc(
+		func() {
 			app.Draw()
 		})
+	resultsView.SetBorder(true).SetTitle("Results")
+
+	logsView = tview.NewTextView().SetChangedFunc(
+		func() {
+			app.Draw()
+		})
+	logsView.SetBorder(true).SetTitle("Logs")
+
+	flexBox := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(resultsView, 0, 3, false).
+		AddItem(logsView, 0, 1, false)
+
+	app = app.SetRoot(flexBox, true).SetFocus(flexBox)
 }
 
 // Adds a result to the result store.
@@ -79,13 +93,14 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 
 // Presents raw output.
 func RawResults() {
+	// Update the results pane with new results as they are generated.
 	go func() {
-		for i := 0; i < 10; i++ {
-			fmt.Fprintf(resultsView, "The next number is: %d\n", i)
-			time.Sleep(1 * time.Second)
+		for {
+			fmt.Fprintln(resultsView, <-PutEvents)
 		}
 	}()
 
-	err := app.SetRoot(resultsView, true).SetFocus(resultsView).Run()
+	// Start the display.
+	err := app.Run()
 	e(err)
 }

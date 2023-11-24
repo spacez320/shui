@@ -98,7 +98,7 @@ func main() {
 		logger.SetOutput(ioutil.Discard)
 	} else {
 		slog.SetDefault(slog.New(slog.NewTextHandler(
-			os.Stdout,
+			os.Stderr,
 			&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
 		)))
 	}

@@ -30,7 +30,7 @@ type Results []result
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-var PutEvents chan result
+var PutEvents = make(chan result, 1)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -70,22 +70,28 @@ func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []resu
 
 // Put a new result.
 func (r *Results) Put(value interface{}) interface{} {
-	*r = append(*r, result{
+	next := result{
 		Time:   time.Now(),
 		Value:  value,
 		Values: nil,
-	})
+	}
+
+	*r = append(*r, next)
+	PutEvents <- next
 
 	return value
 }
 
 // Put a new compound result.
 func (r *Results) PutC(values ...interface{}) []interface{} {
-	*r = append(*r, result{
+	next := result{
 		Time:   time.Now(),
 		Value:  nil,
 		Values: values,
-	})
+	}
+
+	*r = append(*r, next)
+	PutEvents <- next
 
 	return values
 }
