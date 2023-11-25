@@ -95,7 +95,7 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 func StreamResults() {
 	go func() {
 		for {
-			fmt.Fprintln(resultsView, <-PutEvents)
+			fmt.Fprintln(resultsView, (<-PutEvents).Values)
 		}
 	}()
 
