@@ -40,10 +40,16 @@ type resultMode_ int
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+// Mode constants.
 const (
-	MODE_QUERY      mode_       = iota // For running in 'query' mode.
-	MODE_READ                          // For running in 'read' mode.
-	RESULT_MODE_RAW resultMode_ = iota // For running in 'raw' result mode.
+	MODE_QUERY mode_ = iota + 1 // For running in 'query' mode.
+	MODE_READ                   // For running in 'read' mode.
+)
+
+// Result mode constants.
+const (
+	RESULT_MODE_RAW    resultMode_ = iota + 1 // For running in 'raw' result mode.
+	RESULT_MODE_STREAM                        // For running in 'stream' result mode.
 )
 
 var (
@@ -106,16 +112,24 @@ func main() {
 	// Execute the specified mode.
 
 	done := make(chan int)
+
 	switch {
 	case mode == int(MODE_QUERY):
 		slog.Debug("Executing in query mode.")
 		done = Query()
-		RawResults()
 	case mode == int(MODE_READ):
 		slog.Debug("Executing in read mode.")
 		done = Read()
-	default:
-		slog.Error(fmt.Sprintf("Invalid mode: %v", mode))
 	}
+
+	if !silent {
+		switch {
+		case resultMode == int(RESULT_MODE_RAW):
+			RawResults()
+		case resultMode == int(RESULT_MODE_STREAM):
+			StreamResults()
+		}
+	}
+
 	<-done
 }

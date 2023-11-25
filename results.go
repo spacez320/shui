@@ -91,9 +91,8 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 	return
 }
 
-// Presents raw output.
-func RawResults() {
-	// Update the results pane with new results as they are generated.
+// Update the results pane with new results as they are generated.
+func StreamResults() {
 	go func() {
 		for {
 			fmt.Fprintln(resultsView, <-PutEvents)
@@ -103,4 +102,13 @@ func RawResults() {
 	// Start the display.
 	err := app.Run()
 	e(err)
+}
+
+// Presents raw output.
+func RawResults() {
+	go func() {
+		for {
+			fmt.Println(<-PutEvents)
+		}
+	}()
 }

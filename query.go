@@ -13,8 +13,11 @@ import (
 )
 
 // Entrypoint for 'query' mode.
-func Query() (done chan int) {
-	var doneQuery = make(chan bool, len(queries)) // Signals query completion.
+func Query() chan int {
+	var (
+		done      = make(chan int, 1)             // Signals overall completion.
+		doneQuery = make(chan bool, len(queries)) // Signals query completions.
+	)
 
 	// Start the RPC server.
 	initServer()
@@ -34,7 +37,7 @@ func Query() (done chan int) {
 		done <- 1
 	}()
 
-	return
+	return done
 }
 
 // Executes a query.
