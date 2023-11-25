@@ -3,7 +3,9 @@
 
 package main
 
-func modeRead() {
+func Read() (done chan int) {
 	// Start the RPC client.
 	initClient()
+
+	return
 }

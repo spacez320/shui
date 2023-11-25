@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+
+	"golang.org/x/exp/slog"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -28,27 +31,44 @@ func (q *queries_) Set(query string) error {
 	return nil
 }
 
+// Represents the result mode value.
+type resultMode_ int
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Variables
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+// Mode constants.
 const (
-	MODE_QUERY mode_ = iota // For running in 'query' mode.
-	MODE_READ               // For running in 'read' mode.
+	MODE_QUERY mode_ = iota + 1 // For running in 'query' mode.
+	MODE_READ                   // For running in 'read' mode.
+)
+
+// Result mode constants.
+const (
+	RESULT_MODE_RAW    resultMode_ = iota + 1 // For running in 'raw' result mode.
+	RESULT_MODE_STREAM                        // For running in 'stream' result mode.
 )
 
 var (
-	attempts int      // Number of attempts to execute the query.
-	delay    int      // Delay between queries.
-	mode     int      // Mode to execute in.
-	port     string   // Port for RPC.
-	queries  queries_ // Queries to execute.
-	results  Results  // Stored results.
-	silent   bool     // Whether or not to be quiet.
+	attempts   int      // Number of attempts to execute the query.
+	delay      int      // Delay between queries.
+	logLevel   string   // Log level.
+	mode       int      // Mode to execute in.
+	port       string   // Port for RPC.
+	queries    queries_ // Queries to execute.
+	resultMode int      // Result mode to display.
+	silent     bool     // Whether or not to be quiet.
 
-	logger = log.Default() // Logging system.
+	logger                 = log.Default() // Logging system.
+	logLevelStrToSlogLevel = map[string]slog.Level{
+		"debug": slog.LevelDebug,
+		"info":  slog.LevelInfo,
+		"warn":  slog.LevelWarn,
+		"error": slog.LevelError,
+	} // Log levels acceptable as a flag.
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,33 +80,62 @@ var (
 // General error manager.
 func e(err error) {
 	if err != nil {
-		logger.Fatal(err)
+		slog.Error(err.Error())
 	}
 }
 
 func main() {
 	// Define arguments.
+
 	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
 	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
 	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
+	flag.StringVar(&logLevel, "l", "error", "Log level.")
+	flag.IntVar(&resultMode, "r", int(RESULT_MODE_RAW), "Result mode to display.")
 	flag.StringVar(&port, "p", "12345", "Port for RPC.")
 	flag.Var(&queries, "q", "Query to execute.")
 	flag.Parse()
 
-	// Quiet logging if specified.
+	// Set-up logging.
+
 	if silent {
+		// Silence all output.
 		logger.SetOutput(ioutil.Discard)
+	} else {
+		slog.SetDefault(slog.New(slog.NewTextHandler(
+			os.Stderr,
+			&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+		)))
 	}
+
+	// Execute the specified mode.
+
+	var done chan int
 
 	switch {
 	case mode == int(MODE_QUERY):
-		logger.Println("Executing in query mode.")
-		modeQuery()
+		slog.Debug("Executing in query mode.")
+		done = Query()
 	case mode == int(MODE_READ):
-		logger.Println("Executing in read mode.")
-		modeRead()
+		slog.Debug("Executing in read mode.")
+		done = Read()
 	default:
-		logger.Fatalf("Invalid mode: %v", mode)
+		slog.Error(fmt.Sprintf("Invalid mode: %d\n", mode))
+		os.Exit(1)
 	}
+
+	if !silent {
+		switch {
+		case resultMode == int(RESULT_MODE_RAW):
+			RawResults()
+		case resultMode == int(RESULT_MODE_STREAM):
+			StreamResults()
+		default:
+			slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
+			os.Exit(1)
+		}
+	}
+
+	<-done
 }

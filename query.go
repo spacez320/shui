@@ -4,19 +4,19 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"os/exec"
-	"strconv"
-	"strings"
-	"text/scanner"
 	"time"
-	"unicode"
+
+	"golang.org/x/exp/slog"
 )
 
 // Entrypoint for 'query' mode.
-func modeQuery() {
+func Query() chan int {
 	var (
-		doneQuery = make(chan bool, len(queries))
+		done      = make(chan int, 1)             // Signals overall completion.
+		doneQuery = make(chan bool, len(queries)) // Signals query completions.
 	)
 
 	// Start the RPC server.
@@ -27,50 +27,17 @@ func modeQuery() {
 		go runQuery(query, doneQuery)
 	}
 
-	// Wait for the queries to finish.
-	for i := 0; i < len(queries); i++ {
-		<-doneQuery
-	}
-
-	// Print out results for debugging.
-	results.Show()
-}
-
-// Parses a query result into compound values.
-func parseQueryOutput(output string) (parsed []interface{}) {
-	var (
-		s    scanner.Scanner // Scanner for tokenization.
-		next string          // Next token to consider.
-	)
-
-	s.Init(strings.NewReader(output))
-	s.IsIdentRune = func(r rune, i int) bool {
-		// Separate all tokens exclusively by whitespace.
-		return !unicode.IsSpace(r)
-	}
-
-	for token := s.Scan(); token != scanner.EOF; token = s.Scan() {
-		next = s.TokenText()
-
-		// Attempt to parse this value as an integer.
-		nextInt, err := strconv.ParseInt(next, 10, 0)
-		if err == nil {
-			parsed = append(parsed, nextInt)
-			continue
+	go func() {
+		// Wait for the queries to finish.
+		for i := 0; i < len(queries); i++ {
+			<-doneQuery
 		}
 
-		// Attempt to parse this value as a float.
-		nextFloat, err := strconv.ParseFloat(next, 10)
-		if err == nil {
-			parsed = append(parsed, nextFloat)
-			continue
-		}
+		// Signal overall completion.
+		done <- 1
+	}()
 
-		// Everything else has failed--just pass it as a string.
-		parsed = append(parsed, next)
-	}
-
-	return
+	return done
 }
 
 // Executes a query.
@@ -79,7 +46,7 @@ func runQuery(query string, doneQuery chan bool) {
 	// indefinitely if attempts is less than zero.
 	for i := 0; attempts < 0 || i < attempts; i++ {
 		// Prepare query execution.
-		logger.Printf("Executing query: '%s' ...\n", query)
+		slog.Debug(fmt.Sprintf("Executing query: '%s' ...\n", query))
 		cmd := exec.Command("bash", "-c", query)
 
 		// Set-up pipes for command output.
@@ -96,15 +63,14 @@ func runQuery(query string, doneQuery chan bool) {
 		cmd_stderr_output, cmd_stderr_output_err := io.ReadAll(stderr)
 		e(cmd_stderr_output_err)
 		if len(cmd_stderr_output) != 0 {
-			logger.Fatalf("Error is: \n%s\n", cmd_stderr_output)
+			slog.Error(fmt.Sprintf("Error is: \n%s\n", cmd_stderr_output))
 		}
 
 		// Interpret results.
 		cmd_output, cmd_output_err := io.ReadAll(stdout)
 		e(cmd_output_err)
-		// results.Put(cmd_output) // TODO Preserving, pending the removal of simple results.
-		results.PutC(parseQueryOutput(string(cmd_output))...)
-		logger.Printf("Result is: \n%s\n", cmd_output)
+		AddResult(string(cmd_output))
+		slog.Debug(fmt.Sprintf("Result is: \n%s\n", cmd_output))
 
 		// Clean-up.
 		cmd.Wait()
