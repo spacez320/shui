@@ -111,7 +111,7 @@ func main() {
 
 	// Execute the specified mode.
 
-	done := make(chan int)
+	var done chan int
 
 	switch {
 	case mode == int(MODE_QUERY):
@@ -120,6 +120,9 @@ func main() {
 	case mode == int(MODE_READ):
 		slog.Debug("Executing in read mode.")
 		done = Read()
+	default:
+		slog.Error(fmt.Sprintf("Invalid mode: %d\n", mode))
+		os.Exit(1)
 	}
 
 	if !silent {
@@ -128,6 +131,9 @@ func main() {
 			RawResults()
 		case resultMode == int(RESULT_MODE_STREAM):
 			StreamResults()
+		default:
+			slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
+			os.Exit(1)
 		}
 	}
 
