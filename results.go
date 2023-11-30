@@ -48,7 +48,7 @@ func init() {
 // TODO In the future, multiple result stores could be implemented by making
 // this a function of an interface.
 func AddResult(result string) {
-	results.PutC(TokenizeResult(result)...)
+	results.Put(result, TokenizeResult(result)...)
 }
 
 // Parses a result into tokens for compound storage.
