@@ -48,6 +48,7 @@ func init() {
 // TODO In the future, multiple result stores could be implemented by making
 // this a function of an interface.
 func AddResult(result string) {
+	result = strings.TrimSpace(result)
 	results.Put(result, TokenizeResult(result)...)
 }
 
@@ -95,7 +96,7 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 func StreamResults() {
 	go func() {
 		for {
-			fmt.Fprintln(resultsView, (<-PutEvents).Values)
+			fmt.Fprintln(resultsView, (<-PutEvents).Value)
 		}
 	}()
 
