@@ -130,6 +130,12 @@ func main() {
 		case resultMode == int(RESULT_MODE_RAW):
 			RawResults()
 		case resultMode == int(RESULT_MODE_STREAM):
+			// Pass logs into the logs view pane.
+			slog.SetDefault(slog.New(slog.NewTextHandler(
+				logsView,
+				&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+			)))
+
 			StreamResults()
 		default:
 			slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))

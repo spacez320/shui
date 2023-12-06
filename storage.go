@@ -68,25 +68,11 @@ func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []resu
 	return
 }
 
-// Put a new result.
-func (r *Results) Put(value interface{}) interface{} {
+// Put a new compound result.
+func (r *Results) Put(value string, values ...interface{}) []interface{} {
 	next := result{
 		Time:   time.Now(),
 		Value:  value,
-		Values: nil,
-	}
-
-	*r = append(*r, next)
-	PutEvents <- next
-
-	return value
-}
-
-// Put a new compound result.
-func (r *Results) PutC(values ...interface{}) []interface{} {
-	next := result{
-		Time:   time.Now(),
-		Value:  nil,
 		Values: values,
 	}
 
