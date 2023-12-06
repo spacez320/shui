@@ -88,7 +88,7 @@ func TestPutC(t *testing.T) {
 	results := testStorage()
 
 	// It successfully appends a compound result.
-	results.PutC("fizz", 3)
+	results.Put("fizz", "fizz", 3)
 	expected := make([]interface{}, 0)
 	expected = append(expected, "fizz")
 	expected = append(expected, 3)
