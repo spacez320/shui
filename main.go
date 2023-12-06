@@ -52,6 +52,7 @@ const (
 const (
 	RESULT_MODE_RAW    resultMode_ = iota + 1 // For running in 'raw' result mode.
 	RESULT_MODE_STREAM                        // For running in 'stream' result mode.
+	RESULT_MODE_TABLE                         // For running in 'table' result mode.
 )
 
 var (
@@ -132,6 +133,14 @@ func main() {
 			)))
 
 			lib.StreamResults()
+		case resultMode == int(RESULT_MODE_TABLE):
+			// Pass logs into the logs view pane.
+			slog.SetDefault(slog.New(slog.NewTextHandler(
+				lib.LogsView,
+				&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+			)))
+
+			lib.TableResults()
 		default:
 			slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
 			os.Exit(1)

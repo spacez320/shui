@@ -116,3 +116,29 @@ func RawResults() {
 		}
 	}()
 }
+
+// Creates a table of results for the results pane.
+func TableResults() {
+	// Override the results view to create a table, instead.
+
+	ResultsView := tview.NewTable().SetBorders(true)
+
+	flexBox := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(ResultsView, 0, 3, false).
+		AddItem(LogsView, 0, 1, false)
+
+	app = app.SetRoot(flexBox, true).SetFocus(flexBox)
+
+	go func() {
+		// Draw some test data.
+		i := 0
+		for {
+			ResultsView.InsertRow(i).SetCellSimple(i, 0, (<-storage.PutEvents).Value.(string))
+			i += 1
+		}
+	}()
+
+	// Start the display.
+	err := app.Run()
+	e(err)
+}
