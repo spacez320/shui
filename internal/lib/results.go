@@ -1,7 +1,7 @@
 //
 // Results management.
 
-package main
+package lib
 
 import (
 	"fmt"
@@ -10,35 +10,38 @@ import (
 	"text/scanner"
 	"unicode"
 
+	"pkg/storage"
+
 	"github.com/rivo/tview"
 )
 
 var (
-	app         *tview.Application // Application for display.
-	logsView    *tview.TextView    // View for miscellaneous log output.
-	resultsView *tview.TextView    // View for results.
-	results     Results            // Stored results.
+	app     *tview.Application // Application for display.
+	results storage.Results    // Stored results.
+
+	LogsView    *tview.TextView // View for miscellaneous log output.
+	ResultsView *tview.TextView // View for results.
 )
 
 // Initializes the results display.
 func init() {
 	app = tview.NewApplication()
 
-	resultsView = tview.NewTextView().SetChangedFunc(
+	ResultsView = tview.NewTextView().SetChangedFunc(
 		func() {
 			app.Draw()
 		})
-	resultsView.SetBorder(true).SetTitle("Results")
+	ResultsView.SetBorder(true).SetTitle("Results")
 
-	logsView = tview.NewTextView().SetChangedFunc(
+	LogsView = tview.NewTextView().SetChangedFunc(
 		func() {
 			app.Draw()
 		})
-	logsView.SetBorder(true).SetTitle("Logs")
+	LogsView.SetBorder(true).SetTitle("Logs")
 
 	flexBox := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(resultsView, 0, 3, false).
-		AddItem(logsView, 0, 1, false)
+		AddItem(ResultsView, 0, 3, false).
+		AddItem(LogsView, 0, 1, false)
 
 	app = app.SetRoot(flexBox, true).SetFocus(flexBox)
 }
@@ -96,7 +99,7 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 func StreamResults() {
 	go func() {
 		for {
-			fmt.Fprintln(resultsView, (<-PutEvents).Value)
+			fmt.Fprintln(ResultsView, (<-storage.PutEvents).Value)
 		}
 	}()
 
@@ -109,7 +112,7 @@ func StreamResults() {
 func RawResults() {
 	go func() {
 		for {
-			fmt.Println(<-PutEvents)
+			fmt.Println(<-storage.PutEvents)
 		}
 	}()
 }

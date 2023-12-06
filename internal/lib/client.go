@@ -1,11 +1,13 @@
 //
 // Client for RPC.
 
-package main
+package lib
 
 import (
 	"fmt"
 	"net/rpc"
+
+	"pkg/storage"
 )
 
 var (
@@ -13,16 +15,16 @@ var (
 )
 
 // Establish the RPC client to query results.
-func initClient() {
+func initClient(port string) {
 	var (
 		err   error
-		reply ResultsRPC
+		reply storage.ResultsRPC
 	)
 
 	client, err = rpc.DialHTTP("tcp", fmt.Sprintf("localhost:%v", port))
 	e(err)
 
-	err = client.Call("Results.GetAllRPC", ArgsRPC{}, &reply)
+	err = client.Call("Results.GetAllRPC", storage.ArgsRPC{}, &reply)
 	e(err)
 
 	// TODO For now, just print results until we define actions that

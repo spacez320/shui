@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 
+	"internal/lib"
+
 	"golang.org/x/exp/slog"
 )
 
@@ -77,13 +79,6 @@ var (
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-// General error manager.
-func e(err error) {
-	if err != nil {
-		slog.Error(err.Error())
-	}
-}
-
 func main() {
 	// Define arguments.
 
@@ -116,10 +111,10 @@ func main() {
 	switch {
 	case mode == int(MODE_QUERY):
 		slog.Debug("Executing in query mode.")
-		done = Query()
+		done = lib.Query(queries, attempts, delay, port)
 	case mode == int(MODE_READ):
 		slog.Debug("Executing in read mode.")
-		done = Read()
+		done = lib.Read(port)
 	default:
 		slog.Error(fmt.Sprintf("Invalid mode: %d\n", mode))
 		os.Exit(1)
@@ -128,15 +123,15 @@ func main() {
 	if !silent {
 		switch {
 		case resultMode == int(RESULT_MODE_RAW):
-			RawResults()
+			lib.RawResults()
 		case resultMode == int(RESULT_MODE_STREAM):
 			// Pass logs into the logs view pane.
 			slog.SetDefault(slog.New(slog.NewTextHandler(
-				logsView,
+				lib.LogsView,
 				&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
 			)))
 
-			StreamResults()
+			lib.StreamResults()
 		default:
 			slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
 			os.Exit(1)

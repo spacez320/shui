@@ -1,7 +1,7 @@
 //
 // Logic for 'query' mode.
 
-package main
+package lib
 
 import (
 	"fmt"
@@ -13,18 +13,18 @@ import (
 )
 
 // Entrypoint for 'query' mode.
-func Query() chan int {
+func Query(queries []string, attempts int, delay int, port string) chan int {
 	var (
 		done      = make(chan int, 1)             // Signals overall completion.
 		doneQuery = make(chan bool, len(queries)) // Signals query completions.
 	)
 
 	// Start the RPC server.
-	initServer()
+	initServer(port)
 
 	// Execute the queries.
 	for _, query := range queries {
-		go runQuery(query, doneQuery)
+		go runQuery(query, attempts, delay, doneQuery)
 	}
 
 	go func() {
@@ -41,7 +41,7 @@ func Query() chan int {
 }
 
 // Executes a query.
-func runQuery(query string, doneQuery chan bool) {
+func runQuery(query string, attempts int, delay int, doneQuery chan bool) {
 	// This loop executes as long as attempts has not been reached or
 	// indefinitely if attempts is less than zero.
 	for i := 0; attempts < 0 || i < attempts; i++ {

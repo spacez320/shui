@@ -1,7 +1,7 @@
 //
 // Storage management for query results.
 
-package main
+package storage
 
 import (
 	"fmt"
