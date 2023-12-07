@@ -20,6 +20,6 @@ func initServer(port string) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
 	e(err)
 
-	slog.Debug("Listening on :%s.\n", port)
+	slog.Debug(fmt.Sprintf("Listening on :%v.\n", port))
 	go http.Serve(listener, nil)
 }

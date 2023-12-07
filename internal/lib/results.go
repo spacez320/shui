@@ -15,35 +15,45 @@ import (
 	"github.com/rivo/tview"
 )
 
+const (
+	RESULTS_SIZE = 3 // Proportional size of the results widget.
+	LOGS_SIZE    = 1 // Proportional size of the logs widget.
+)
+
 var (
 	app     *tview.Application // Application for display.
 	results storage.Results    // Stored results.
 
-	LogsView    *tview.TextView // View for miscellaneous log output.
-	ResultsView *tview.TextView // View for results.
+	// Widget for displaying logs. Publicly offered to allow log configuration.
+	LogsView *tview.TextView
 )
 
-// Initializes the results display.
+// Set-up the sync for logs used by some result modes.
 func init() {
+	LogsView = tview.NewTextView().SetChangedFunc(func() { app.Draw() })
+	LogsView.SetBorder(true).SetTitle("Logs")
+}
+
+// Sets-up the flex box, which defines the overall layout.
+func initDisplay(resultsView tview.Primitive, logsView tview.Primitive) {
 	app = tview.NewApplication()
 
-	ResultsView = tview.NewTextView().SetChangedFunc(
-		func() {
-			app.Draw()
-		})
-	ResultsView.SetBorder(true).SetTitle("Results")
-
-	LogsView = tview.NewTextView().SetChangedFunc(
-		func() {
-			app.Draw()
-		})
-	LogsView.SetBorder(true).SetTitle("Logs")
-
 	flexBox := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(ResultsView, 0, 3, false).
-		AddItem(LogsView, 0, 1, false)
+		AddItem(resultsView, 0, RESULTS_SIZE, false).
+		AddItem(logsView, 0, LOGS_SIZE, false)
 
-	app = app.SetRoot(flexBox, true).SetFocus(flexBox)
+	app.SetRoot(flexBox, true).SetFocus(flexBox)
+}
+
+// Starts the display. Expects a function to execute within a goroutine to
+// update the display.
+func display(f func()) {
+	// Execute the update function.
+	go func() { f() }()
+
+	// Start the display.
+	err := app.Run()
+	e(err)
 }
 
 // Adds a result to the result store.
@@ -97,15 +107,21 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 
 // Update the results pane with new results as they are generated.
 func StreamResults() {
-	go func() {
-		for {
-			fmt.Fprintln(ResultsView, (<-storage.PutEvents).Value)
-		}
-	}()
+	resultsView := tview.NewTextView().SetChangedFunc(
+		func() {
+			app.Draw()
+		})
+	resultsView.SetBorder(true).SetTitle("Results")
 
-	// Start the display.
-	err := app.Run()
-	e(err)
+	initDisplay(resultsView, LogsView)
+
+	display(
+		func() {
+			for {
+				fmt.Fprintln(resultsView, (<-storage.PutEvents).Value)
+			}
+		},
+	)
 }
 
 // Presents raw output.
@@ -115,4 +131,42 @@ func RawResults() {
 			fmt.Println(<-storage.PutEvents)
 		}
 	}()
+}
+
+// Creates a table of results for the results pane.
+func TableResults() {
+	resultsView := tview.NewTable().SetBorders(true)
+
+	initDisplay(resultsView, LogsView)
+
+	display(
+		func() {
+			i := 0 // Used to determine the next row index.
+
+			for {
+				// Retrieve the next result.
+				next := <-storage.PutEvents
+
+				// Display the new result.
+				row := resultsView.InsertRow(i)
+				for j, token := range next.Values {
+					// Extrapolate the field types in order to print them out.
+					switch token.(type) {
+					case int64:
+						row.SetCellSimple(i, j, strconv.FormatInt(token.(int64), 10))
+					case float64:
+						row.SetCellSimple(i, j, strconv.FormatFloat(token.(float64), 'E', -1, 64))
+					default:
+						row.SetCellSimple(i, j, token.(string))
+					}
+				}
+
+				i += 1
+			}
+		},
+	)
+
+	// Start the display.
+	err := app.Run()
+	e(err)
 }
