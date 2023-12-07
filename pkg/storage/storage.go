@@ -15,14 +15,14 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 // Individual result.
-type result struct {
+type Result struct {
 	Time   time.Time
 	Value  interface{}
 	Values []interface{}
 }
 
 // Collection of results.
-type Results []result
+type Results []Result
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -30,7 +30,7 @@ type Results []result
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-var PutEvents = make(chan result, 128)
+var PutEvents = make(chan Result, 128)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -39,7 +39,7 @@ var PutEvents = make(chan result, 128)
 ////////////////////////////////////////////////////////////////////////////////
 
 // Get a result based on a timestamp.
-func (r *Results) Get(time time.Time) result {
+func (r *Results) Get(time time.Time) Result {
 	for _, result := range *r {
 		if result.Time.Compare(time) == 0 {
 			// We found a result to return.
@@ -48,11 +48,11 @@ func (r *Results) Get(time time.Time) result {
 	}
 
 	// Return an empty result if nothing was discovered.
-	return result{}
+	return Result{}
 }
 
 // Gets results based on a start and end timestamp.
-func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []result) {
+func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []Result) {
 	for _, result := range *r {
 		if result.Time.Compare(startTime) >= 0 {
 			if result.Time.Compare(endTime) > 0 {
@@ -70,7 +70,7 @@ func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []resu
 
 // Put a new compound result.
 func (r *Results) Put(value string, values ...interface{}) []interface{} {
-	next := result{
+	next := Result{
 		Time:   time.Now(),
 		Value:  value,
 		Values: values,

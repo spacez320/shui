@@ -121,6 +121,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Execute result viewing.
+
 	if !silent {
 		switch {
 		case resultMode == int(RESULT_MODE_RAW):
