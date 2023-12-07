@@ -14,12 +14,12 @@ func testStorage() Results {
 	testTime, _ := time.Parse(time.ANSIC, time.Stamp)
 
 	return Results{
-		result{
+		Result{
 			Time:   testTime,
 			Value:  "foo",
 			Values: nil,
 		},
-		result{
+		Result{
 			Time:   testTime.Add(time.Second * 30),
 			Value:  "bar",
 			Values: nil,
@@ -39,7 +39,7 @@ func TestGet(t *testing.T) {
 
 	// It gets no results if a time does not match.
 	got = results.Get(testTime.Add(time.Second * 15))
-	expected = result{}
+	expected = Result{}
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Got: %v Expected: %v\n", got, expected)
 	}
