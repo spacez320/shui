@@ -5,6 +5,7 @@ package lib
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"text/scanner"
@@ -12,12 +13,14 @@ import (
 
 	"pkg/storage"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
 const (
-	RESULTS_SIZE = 3 // Proportional size of the results widget.
-	LOGS_SIZE    = 1 // Proportional size of the logs widget.
+	LOGS_SIZE     = 1 // Proportional size of the logs widget.
+	RESULTS_SIZE  = 3 // Proportional size of the results widget.
+	TABLE_PADDING = 2 // Padding for table cell entries.
 )
 
 var (
@@ -42,7 +45,7 @@ func initDisplay(resultsView tview.Primitive, logsView tview.Primitive) {
 		AddItem(resultsView, 0, RESULTS_SIZE, false).
 		AddItem(logsView, 0, LOGS_SIZE, false)
 
-	app.SetRoot(flexBox, true).SetFocus(flexBox)
+	app.SetRoot(flexBox, true).SetFocus(resultsView)
 }
 
 // Starts the display. Expects a function to execute within a goroutine to
@@ -136,8 +139,20 @@ func RawResults() {
 // Creates a table of results for the results pane.
 func TableResults() {
 	resultsView := tview.NewTable().SetBorders(true)
+	tableCellPadding := strings.Repeat(" ", TABLE_PADDING)
 
 	initDisplay(resultsView, LogsView)
+
+	resultsView.SetDoneFunc(
+		func(key tcell.Key) {
+			switch key {
+			case tcell.KeyEscape:
+				// When a user presses Esc, close the application.
+				app.Stop()
+				os.Exit(0)
+			}
+		},
+	)
 
 	display(
 		func() {
@@ -150,15 +165,19 @@ func TableResults() {
 				// Display the new result.
 				row := resultsView.InsertRow(i)
 				for j, token := range next.Values {
+					var nextCellContent string
+
 					// Extrapolate the field types in order to print them out.
 					switch token.(type) {
 					case int64:
-						row.SetCellSimple(i, j, strconv.FormatInt(token.(int64), 10))
+						nextCellContent = strconv.FormatInt(token.(int64), 10)
 					case float64:
-						row.SetCellSimple(i, j, strconv.FormatFloat(token.(float64), 'E', -1, 64))
+						nextCellContent = strconv.FormatFloat(token.(float64), 'f', -1, 64)
 					default:
-						row.SetCellSimple(i, j, token.(string))
+						nextCellContent = token.(string)
 					}
+
+					row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
 				}
 
 				i += 1
