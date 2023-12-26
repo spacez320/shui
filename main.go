@@ -53,6 +53,7 @@ const (
 	RESULT_MODE_RAW    resultMode_ = iota + 1 // For running in 'raw' result mode.
 	RESULT_MODE_STREAM                        // For running in 'stream' result mode.
 	RESULT_MODE_TABLE                         // For running in 'table' result mode.
+	RESULT_MODE_GRAPH                         // For running in 'graph' result mode.
 )
 
 var (
@@ -124,10 +125,10 @@ func main() {
 	// Execute result viewing.
 
 	if !silent {
-		switch {
-		case resultMode == int(RESULT_MODE_RAW):
+		switch resultMode {
+		case int(RESULT_MODE_RAW):
 			lib.RawResults()
-		case resultMode == int(RESULT_MODE_STREAM):
+		case int(RESULT_MODE_STREAM):
 			// Pass logs into the logs view pane.
 			slog.SetDefault(slog.New(slog.NewTextHandler(
 				lib.LogsView,
@@ -135,7 +136,7 @@ func main() {
 			)))
 
 			lib.StreamResults()
-		case resultMode == int(RESULT_MODE_TABLE):
+		case int(RESULT_MODE_TABLE):
 			// Pass logs into the logs view pane.
 			slog.SetDefault(slog.New(slog.NewTextHandler(
 				lib.LogsView,
@@ -143,6 +144,17 @@ func main() {
 			)))
 
 			lib.TableResults()
+		case int(RESULT_MODE_GRAPH):
+			// Pass logs into the logs view pane.
+			//
+			// FIXME Log management for termdash applications doesn't work the same
+			// way and needs to be managed.
+			// slog.SetDefault(slog.New(slog.NewTextHandler(
+			// 	lib.LogsView,
+			// 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+			// )))
+
+			lib.GraphResults()
 		default:
 			slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
 			os.Exit(1)
