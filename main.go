@@ -33,9 +33,6 @@ func (q *queries_) Set(query string) error {
 	return nil
 }
 
-// Represents the result mode value.
-type resultMode_ int
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Variables
@@ -48,23 +45,16 @@ const (
 	MODE_READ                   // For running in 'read' mode.
 )
 
-// Result mode constants.
-const (
-	RESULT_MODE_RAW    resultMode_ = iota + 1 // For running in 'raw' result mode.
-	RESULT_MODE_STREAM                        // For running in 'stream' result mode.
-	RESULT_MODE_TABLE                         // For running in 'table' result mode.
-	RESULT_MODE_GRAPH                         // For running in 'graph' result mode.
-)
-
 var (
-	attempts   int      // Number of attempts to execute the query.
-	delay      int      // Delay between queries.
-	logLevel   string   // Log level.
-	mode       int      // Mode to execute in.
-	port       string   // Port for RPC.
-	queries    queries_ // Queries to execute.
-	resultMode int      // Result mode to display.
-	silent     bool     // Whether or not to be quiet.
+	attempts    int      // Number of attempts to execute the query.
+	delay       int      // Delay between queries.
+	logLevel    string   // Log level.
+	mode        int      // Mode to execute in.
+	port        string   // Port for RPC.
+	queries     queries_ // Queries to execute.
+	resultMode  int      // Result mode to display.
+	silent      bool     // Whether or not to be quiet.
+	valueLabels string   // Provided value labels.
 
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
@@ -89,9 +79,10 @@ func main() {
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
 	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
 	flag.StringVar(&logLevel, "l", "error", "Log level.")
-	flag.IntVar(&resultMode, "r", int(RESULT_MODE_RAW), "Result mode to display.")
+	flag.IntVar(&resultMode, "r", int(lib.RESULT_MODE_RAW), "Result mode to display.")
 	flag.StringVar(&port, "p", "12345", "Port for RPC.")
 	flag.Var(&queries, "q", "Query to execute.")
+	flag.StringVar(&valueLabels, "v", "", "Labels to apply to query values, separated by commas.")
 	flag.Parse()
 
 	// Set-up logging.
@@ -125,40 +116,7 @@ func main() {
 	// Execute result viewing.
 
 	if !silent {
-		switch resultMode {
-		case int(RESULT_MODE_RAW):
-			lib.RawResults()
-		case int(RESULT_MODE_STREAM):
-			// Pass logs into the logs view pane.
-			slog.SetDefault(slog.New(slog.NewTextHandler(
-				lib.LogsView,
-				&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
-			)))
-
-			lib.StreamResults()
-		case int(RESULT_MODE_TABLE):
-			// Pass logs into the logs view pane.
-			slog.SetDefault(slog.New(slog.NewTextHandler(
-				lib.LogsView,
-				&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
-			)))
-
-			lib.TableResults()
-		case int(RESULT_MODE_GRAPH):
-			// Pass logs into the logs view pane.
-			//
-			// FIXME Log management for termdash applications doesn't work the same
-			// way and needs to be managed.
-			// slog.SetDefault(slog.New(slog.NewTextHandler(
-			// 	lib.LogsView,
-			// 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
-			// )))
-
-			lib.GraphResults()
-		default:
-			slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
-			os.Exit(1)
-		}
+		lib.Results(lib.ResultMode(resultMode), []string{"foo", "bar", "biz"})
 	}
 
 	<-done

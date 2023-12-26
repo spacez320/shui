@@ -29,10 +29,26 @@ import (
 	"github.com/mum4k/termdash/widgetapi"
 	"github.com/mum4k/termdash/widgets/sparkline"
 	"github.com/rivo/tview"
+	"golang.org/x/exp/slog"
 )
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Types
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Represents the display mode.
 type display_ int
+
+// Represents the result mode value.
+type ResultMode_ int
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Variables
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const (
 	LOGS_SIZE     = 1 // Proportional size of the logs widget.
@@ -40,11 +56,20 @@ const (
 	TABLE_PADDING = 2 // Padding for table cell entries.
 )
 
+// Display constants. Each result mode uses a specific display.
 const (
 	DISPLAY_RAW      display_ = iota + 1 // Used for direct output.
 	DISPLAY_TVIEW                        // Used when tview is the TUI driver.
 	DISPLAY_TERMDASH                     // Used when termdash is the TUI driver.
 
+)
+
+// Result mode constants.
+const (
+	RESULT_MODE_RAW    ResultMode_ = iota + 1 // For running in 'raw' result mode.
+	RESULT_MODE_STREAM                        // For running in 'stream' result mode.
+	RESULT_MODE_TABLE                         // For running in 'table' result mode.
+	RESULT_MODE_GRAPH                         // For running in 'graph' result mode.
 )
 
 var (
@@ -75,7 +100,7 @@ func init() {
 	// Initializing this is harmless, even if tview won't be used.
 	//
 	// TODO This should be probably be managed outside of init and should be made
-	// display mode agnostic, if possible.
+	// display mode agnostic.
 	LogsView = tview.NewTextView().SetChangedFunc(func() { app.Draw() })
 	LogsView.SetBorder(true).SetTitle("Logs")
 }
@@ -153,6 +178,27 @@ func AddResult(result string) {
 	results.Put(result, TokenizeResult(result)...)
 }
 
+// Retruns a result mode.
+func ResultMode(i int) (resultMode ResultMode_) {
+	switch i {
+	case 1:
+		resultMode = RESULT_MODE_RAW
+	case 2:
+		resultMode = RESULT_MODE_STREAM
+	case 3:
+		resultMode = RESULT_MODE_TABLE
+	case 4:
+		resultMode = RESULT_MODE_GRAPH
+	}
+
+	return
+}
+
+// Declares the labels for values in a result.
+func SetLabels(labels []string) {
+	results.Labels = labels
+}
+
 // Parses a result into tokens for compound storage.
 //
 // TODO In the future, multiple result stores could be implemented by making
@@ -198,6 +244,44 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 // Result Modes
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Entry-point function for results.
+func Results(resultMode ResultMode_, labels []string) {
+	switch resultMode {
+	case RESULT_MODE_RAW:
+		RawResults()
+	case RESULT_MODE_STREAM:
+		// Pass logs into the logs view pane.
+		/* slog.SetDefault(slog.New(slog.NewTextHandler( */
+		/* 	LogsView, */
+		/* 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]}, */
+		/* ))) */
+
+		StreamResults()
+	case RESULT_MODE_TABLE:
+		// Pass logs into the logs view pane.
+		/* slog.SetDefault(slog.New(slog.NewTextHandler( */
+		/* 	lib.LogsView, */
+		/* 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]}, */
+		/* ))) */
+
+		TableResults()
+	case RESULT_MODE_GRAPH:
+		// Pass logs into the logs view pane.
+		//
+		// FIXME Log management for termdash applications doesn't work the same
+		// way and needs to be managed.
+		// slog.SetDefault(slog.New(slog.NewTextHandler(
+		// 	lib.LogsView,
+		// 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+		// )))
+
+		GraphResults()
+	default:
+		slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
+		os.Exit(1)
+	}
+}
 
 // Presents raw output.
 func RawResults() {

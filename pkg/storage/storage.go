@@ -22,7 +22,10 @@ type Result struct {
 }
 
 // Collection of results.
-type Results []Result
+type Results struct {
+	Labels  []string
+	Results []Result
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -40,7 +43,7 @@ var PutEvents = make(chan Result, 128)
 
 // Get a result based on a timestamp.
 func (r *Results) Get(time time.Time) Result {
-	for _, result := range *r {
+	for _, result := range (*r).Results {
 		if result.Time.Compare(time) == 0 {
 			// We found a result to return.
 			return result
@@ -53,7 +56,7 @@ func (r *Results) Get(time time.Time) Result {
 
 // Gets results based on a start and end timestamp.
 func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []Result) {
-	for _, result := range *r {
+	for _, result := range (*r).Results {
 		if result.Time.Compare(startTime) >= 0 {
 			if result.Time.Compare(endTime) > 0 {
 				// Break out of the loop if we've exhausted the upper bounds of the
@@ -76,7 +79,7 @@ func (r *Results) Put(value string, values ...interface{}) []interface{} {
 		Values: values,
 	}
 
-	*r = append(*r, next)
+	(*r).Results = append((*r).Results, next)
 	PutEvents <- next
 
 	return values
@@ -84,8 +87,9 @@ func (r *Results) Put(value string, values ...interface{}) []interface{} {
 
 // Show all currently stored results.
 func (r *Results) Show() {
-	for _, result := range *r {
-		fmt.Printf("Time: %v, Value: %v, Values: %v\n", result.Time, result.Value, result.Values)
+	for _, result := range (*r).Results {
+		fmt.Printf("Label: %v, Time: %v, Value: %v, Values: %v\n",
+			(*r).Labels, result.Time, result.Value, result.Values)
 	}
 }
 
