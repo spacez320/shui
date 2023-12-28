@@ -4,7 +4,7 @@
 // Managing results involves:
 //
 // -  Organizing a storage of results.
-// -  Managing the TUI libraries, rendering, and interaction for results.
+// -  Managing the TUI libraries--rendering and interaction for results.
 // -  Finding a place for accessory output, like logs.
 
 package lib
@@ -29,6 +29,7 @@ import (
 	"github.com/mum4k/termdash/widgetapi"
 	"github.com/mum4k/termdash/widgets/sparkline"
 	"github.com/rivo/tview"
+	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog"
 )
 
@@ -42,7 +43,7 @@ import (
 type display_ int
 
 // Represents the result mode value.
-type ResultMode_ int
+type ResultMode int
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -66,10 +67,10 @@ const (
 
 // Result mode constants.
 const (
-	RESULT_MODE_RAW    ResultMode_ = iota + 1 // For running in 'raw' result mode.
-	RESULT_MODE_STREAM                        // For running in 'stream' result mode.
-	RESULT_MODE_TABLE                         // For running in 'table' result mode.
-	RESULT_MODE_GRAPH                         // For running in 'graph' result mode.
+	RESULT_MODE_RAW    ResultMode = iota + 1 // For running in 'raw' result mode.
+	RESULT_MODE_STREAM                       // For running in 'stream' result mode.
+	RESULT_MODE_TABLE                        // For running in 'table' result mode.
+	RESULT_MODE_GRAPH                        // For running in 'graph' result mode.
 )
 
 var (
@@ -84,6 +85,22 @@ var (
 	// Only applicable for tview result modes.
 	LogsView *tview.TextView
 )
+
+// Retrieve a result mode from an integer.
+func (ResultMode) Get(i int) (resultMode ResultMode) {
+	switch i {
+	case 1:
+		resultMode = RESULT_MODE_RAW
+	case 2:
+		resultMode = RESULT_MODE_STREAM
+	case 3:
+		resultMode = RESULT_MODE_TABLE
+	case 4:
+		resultMode = RESULT_MODE_GRAPH
+	}
+
+	return
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -178,25 +195,30 @@ func AddResult(result string) {
 	results.Put(result, TokenizeResult(result)...)
 }
 
-// Retruns a result mode.
-func ResultMode(i int) (resultMode ResultMode_) {
-	switch i {
-	case 1:
-		resultMode = RESULT_MODE_RAW
-	case 2:
-		resultMode = RESULT_MODE_STREAM
-	case 3:
-		resultMode = RESULT_MODE_TABLE
-	case 4:
-		resultMode = RESULT_MODE_GRAPH
+// Creates a result with filtered values.
+func FilterResult(result storage.Result, labels []string, filters []string) storage.Result {
+	var (
+		// Indexes of labels from filters, corresponding to result values.
+		labelIndexes = make([]int, len(filters))
+		// Found result values.
+		resultValues = make([]interface{}, len(filters))
+	)
+
+	// Find indexes to pursue for results.
+	for i, filter := range filters {
+		labelIndexes[i] = slices.Index(labels, filter)
 	}
 
-	return
-}
+	// Filter the results.
+	for i, index := range labelIndexes {
+		resultValues[i] = result.Values[index]
+	}
 
-// Declares the labels for values in a result.
-func SetLabels(labels []string) {
-	results.Labels = labels
+	return storage.Result{
+		Time:   result.Time,
+		Value:  result.Value,
+		Values: resultValues,
+	}
 }
 
 // Parses a result into tokens for compound storage.
@@ -246,7 +268,10 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Entry-point function for results.
-func Results(resultMode ResultMode_, labels []string) {
+func Results(resultMode ResultMode, labels []string, filters []string) {
+	// Set up labelling or any schema for the results store.
+	results.Labels = labels
+
 	switch resultMode {
 	case RESULT_MODE_RAW:
 		RawResults()
@@ -308,6 +333,7 @@ func StreamResults() {
 
 	display(
 		func() {
+			fmt.Fprintln(resultsView, results.Labels)
 			for {
 				fmt.Fprintln(resultsView, (<-storage.PutEvents).Value)
 			}
@@ -337,7 +363,13 @@ func TableResults() {
 
 	display(
 		func() {
-			i := 0 // Used to determine the next row index.
+			i := 1 // Used to determine the next row index. Starts at one because of the header row.
+
+			// Populate header.
+			headerRow := resultsView.InsertRow(i)
+			for j, label := range results.Labels {
+				headerRow.SetCellSimple(0, j, tableCellPadding+label+tableCellPadding)
+			}
 
 			for {
 				// Retrieve the next result.

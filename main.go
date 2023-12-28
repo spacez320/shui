@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"internal/lib"
 
@@ -48,13 +49,14 @@ const (
 var (
 	attempts    int      // Number of attempts to execute the query.
 	delay       int      // Delay between queries.
+	filters     string   // Result filters.
 	logLevel    string   // Log level.
 	mode        int      // Mode to execute in.
 	port        string   // Port for RPC.
 	queries     queries_ // Queries to execute.
 	resultMode  int      // Result mode to display.
 	silent      bool     // Whether or not to be quiet.
-	valueLabels string   // Provided value labels.
+	valueLabels string   // Result value labels.
 
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
@@ -77,6 +79,7 @@ func main() {
 	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
 	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
+	flag.StringVar(&filters, "f", "", "Results filters.")
 	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
 	flag.StringVar(&logLevel, "l", "error", "Log level.")
 	flag.IntVar(&resultMode, "r", int(lib.RESULT_MODE_RAW), "Result mode to display.")
@@ -116,7 +119,11 @@ func main() {
 	// Execute result viewing.
 
 	if !silent {
-		lib.Results(lib.ResultMode(resultMode), []string{"foo", "bar", "biz"})
+		lib.Results(
+			lib.ResultMode(resultMode),
+			strings.Split(valueLabels, ","),
+			strings.Split(filters, ","),
+		)
 	}
 
 	<-done
