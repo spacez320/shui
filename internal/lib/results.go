@@ -274,6 +274,7 @@ func Results(resultMode ResultMode, labels []string, filters []string) {
 
 	switch resultMode {
 	case RESULT_MODE_RAW:
+		mode = DISPLAY_RAW
 		RawResults()
 	case RESULT_MODE_STREAM:
 		// Pass logs into the logs view pane.
@@ -282,6 +283,7 @@ func Results(resultMode ResultMode, labels []string, filters []string) {
 		/* 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]}, */
 		/* ))) */
 
+		mode = DISPLAY_TVIEW
 		StreamResults()
 	case RESULT_MODE_TABLE:
 		// Pass logs into the logs view pane.
@@ -290,6 +292,7 @@ func Results(resultMode ResultMode, labels []string, filters []string) {
 		/* 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]}, */
 		/* ))) */
 
+		mode = DISPLAY_TVIEW
 		TableResults()
 	case RESULT_MODE_GRAPH:
 		// Pass logs into the logs view pane.
@@ -301,6 +304,7 @@ func Results(resultMode ResultMode, labels []string, filters []string) {
 		// 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
 		// )))
 
+		mode = DISPLAY_TERMDASH
 		GraphResults()
 	default:
 		slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
@@ -310,8 +314,6 @@ func Results(resultMode ResultMode, labels []string, filters []string) {
 
 // Presents raw output.
 func RawResults() {
-	mode = DISPLAY_RAW
-
 	go func() {
 		for {
 			fmt.Println(<-storage.PutEvents)
@@ -321,16 +323,17 @@ func RawResults() {
 
 // Update the results pane with new results as they are generated.
 func StreamResults() {
-	mode = DISPLAY_TVIEW
-
+	// Initialize the results view.
 	resultsView := tview.NewTextView().SetChangedFunc(
 		func() {
 			app.Draw()
 		})
 	resultsView.SetBorder(true).SetTitle("Results")
 
+	// Initialize the display.
 	initDisplayTview(resultsView, LogsView)
 
+	// Start the display.
 	display(
 		func() {
 			fmt.Fprintln(resultsView, results.Labels)
@@ -343,14 +346,12 @@ func StreamResults() {
 
 // Creates a table of results for the results pane.
 func TableResults() {
-	mode = DISPLAY_TVIEW
+	var (
+		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
+	)
 
-	resultsView := tview.NewTable().SetBorders(true)
-	tableCellPadding := strings.Repeat(" ", TABLE_PADDING)
-
-	initDisplayTview(resultsView, LogsView)
-
-	resultsView.SetDoneFunc(
+	// Initialize the results view.
+	resultsView := tview.NewTable().SetBorders(true).SetDoneFunc(
 		func(key tcell.Key) {
 			switch key {
 			case tcell.KeyEscape:
@@ -361,6 +362,10 @@ func TableResults() {
 		},
 	)
 
+	// Initialize the display.
+	initDisplayTview(resultsView, LogsView)
+
+	// Start the display.
 	display(
 		func() {
 			i := 1 // Used to determine the next row index. Starts at one because of the header row.
@@ -399,22 +404,21 @@ func TableResults() {
 			}
 		},
 	)
-
-	// Start the display.
-	err := app.Run()
-	e(err)
 }
 
 // Creates a graph of results for the results pane.
 func GraphResults() {
-	mode = DISPLAY_TERMDASH
-
+	// Initialize the results view.
 	graph, err := sparkline.New(
 		sparkline.Label("Test Sparkline", cell.FgColor(cell.ColorNumber(33))),
 		sparkline.Color(cell.ColorGreen),
 	)
 	e(err)
 
+	// Initialize the display.
+	initDisplayTermdash(graph)
+
+	// Start the display.
 	display(
 		func() {
 			for {
@@ -426,6 +430,4 @@ func GraphResults() {
 			graph.Add([]int{1, 2, 3})
 		},
 	)
-
-	initDisplayTermdash(graph)
 }
