@@ -139,6 +139,7 @@ func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 	// Run the display.
 	termdash.Run(ctx, t, c, termdash.KeyboardSubscriber(
 		func(k *terminalapi.Keyboard) {
+			// When a user presses Esc, close the application.
 			if k.Key == keyboard.KeyEsc {
 				cancel()
 				t.Close()
@@ -269,7 +270,7 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Entry-point function for results.
-func Results(resultMode ResultMode, labels []string, filters []string) {
+func Results(resultMode ResultMode, labels []string, filters []string, config Config) {
 	// Set up labelling or any schema for the results store.
 	results.Labels = labels
 
@@ -279,19 +280,19 @@ func Results(resultMode ResultMode, labels []string, filters []string) {
 		RawResults()
 	case RESULT_MODE_STREAM:
 		// Pass logs into the logs view pane.
-		/* slog.SetDefault(slog.New(slog.NewTextHandler( */
-		/* 	LogsView, */
-		/* 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]}, */
-		/* ))) */
+		slog.SetDefault(slog.New(slog.NewTextHandler(
+			LogsView,
+			&slog.HandlerOptions{Level: config.SlogLogLevel()},
+		)))
 
 		mode = DISPLAY_TVIEW
 		StreamResults()
 	case RESULT_MODE_TABLE:
 		// Pass logs into the logs view pane.
-		/* slog.SetDefault(slog.New(slog.NewTextHandler( */
-		/* 	lib.LogsView, */
-		/* 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]}, */
-		/* ))) */
+		slog.SetDefault(slog.New(slog.NewTextHandler(
+			LogsView,
+			&slog.HandlerOptions{Level: config.SlogLogLevel()},
+		)))
 
 		mode = DISPLAY_TVIEW
 		TableResults()
@@ -386,9 +387,11 @@ func TableResults() {
 			i := 1 // Used to determine the next row index. Starts at one because of the header row.
 
 			// Populate header.
-			headerRow := resultsView.InsertRow(i)
-			for j, label := range results.Labels {
-				headerRow.SetCellSimple(0, j, tableCellPadding+label+tableCellPadding)
+			if len(results.Labels) > 0 {
+				headerRow := resultsView.InsertRow(i)
+				for j, label := range results.Labels {
+					headerRow.SetCellSimple(0, j, tableCellPadding+label+tableCellPadding)
+				}
 			}
 
 			for {
@@ -430,18 +433,19 @@ func GraphResults() {
 	)
 	e(err)
 
-	// Initialize the display.
-	initDisplayTermdash(graph)
-
 	// Start the display.
 	display(
 		func() {
 			for {
 				next := <-storage.PutEvents
-				graph.Add([]int{int(100 * next.Values[9].(float64))})
+				graph.Add([]int{int(100 * next.Values[0].(float64))})
 			}
 
 			graph.Add([]int{1, 2, 3})
 		},
 	)
+
+	// Initialize the display. This must happen after the display function is
+	// invoked, otherwise data will never appear.
+	initDisplayTermdash(graph)
 }

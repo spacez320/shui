@@ -94,6 +94,7 @@ func main() {
 		// Silence all output.
 		logger.SetOutput(ioutil.Discard)
 	} else {
+		// Set the default to be standard error--result modes may change this.
 		slog.SetDefault(slog.New(slog.NewTextHandler(
 			os.Stderr,
 			&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
@@ -123,6 +124,9 @@ func main() {
 			lib.ResultMode(resultMode),
 			strings.Split(valueLabels, ","),
 			strings.Split(filters, ","),
+			lib.Config{
+				LogLevel: logLevel,
+			},
 		)
 	}
 
