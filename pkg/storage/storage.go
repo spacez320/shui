@@ -16,6 +16,8 @@ package storage
 import (
 	"fmt"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,6 +70,11 @@ func (r *Results) Get(time time.Time) Result {
 
 	// Return an empty result if nothing was discovered.
 	return Result{}
+}
+
+// Given a filter, return the corresponding value index.
+func (r *Results) GetValueIndex(filter string) int {
+	return slices.Index((*r).Labels, filter)
 }
 
 // Gets results based on a start and end timestamp.

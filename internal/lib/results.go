@@ -295,10 +295,10 @@ func Results(resultMode ResultMode, labels []string, filters []string, config Co
 		)))
 
 		mode = DISPLAY_TVIEW
-		TableResults()
+		TableResults(filters)
 	case RESULT_MODE_GRAPH:
 		mode = DISPLAY_TERMDASH
-		GraphResults()
+		GraphResults(filters)
 	default:
 		slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
 		os.Exit(1)
@@ -352,7 +352,7 @@ func StreamResults() {
 }
 
 // Creates a table of results for the results pane.
-func TableResults() {
+func TableResults(filters []string) {
 	var (
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
 	)
@@ -416,20 +416,38 @@ func TableResults() {
 }
 
 // Creates a graph of results for the results pane.
-func GraphResults() {
+func GraphResults(filters []string) {
+	var (
+		// Index of the result value to graph.
+		valueIndex = 0
+	)
+
 	// Initialize the results view.
 	graph, err := sparkline.New(
-		sparkline.Label("Results", cell.FgColor(cell.ColorNumber(33))),
+		sparkline.Label("Results"),
 		sparkline.Color(cell.ColorGreen),
 	)
 	e(err)
+
+	// Determine the values indexes to populate into the graph. Only the first
+	// filter will be considered. If no filter is provided, the index is assumed
+	// to be zero.
+	if len(filters) > 0 {
+		valueIndex = results.GetValueIndex(filters[0])
+	}
 
 	// Start the display.
 	display(
 		func() {
 			for {
-				next := <-storage.PutEvents
-				graph.Add([]int{int(100 * next.Values[0].(float64))})
+				nextValue := (<-storage.PutEvents).Values[valueIndex]
+
+				switch nextValue.(type) {
+				case int64:
+					graph.Add([]int{int(nextValue.(int64))})
+				case float64:
+					graph.Add([]int{int(nextValue.(float64))})
+				}
 			}
 		},
 	)
