@@ -100,7 +100,7 @@ func main() {
 
 	// Set-up logging.
 
-	if silent {
+	if silent || resultMode == int(lib.RESULT_MODE_GRAPH) {
 		// Silence all output.
 		logger.SetOutput(ioutil.Discard)
 	} else {

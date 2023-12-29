@@ -297,15 +297,6 @@ func Results(resultMode ResultMode, labels []string, filters []string, config Co
 		mode = DISPLAY_TVIEW
 		TableResults()
 	case RESULT_MODE_GRAPH:
-		// Pass logs into the logs view pane.
-		//
-		// FIXME Log management for termdash applications doesn't work the same
-		// way and needs to be managed.
-		// slog.SetDefault(slog.New(slog.NewTextHandler(
-		// 	lib.LogsView,
-		// 	&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
-		// )))
-
 		mode = DISPLAY_TERMDASH
 		GraphResults()
 	default:
