@@ -24,6 +24,7 @@ import (
 	"github.com/mum4k/termdash"
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/container"
+	"github.com/mum4k/termdash/keyboard"
 	termdashTcell "github.com/mum4k/termdash/terminal/tcell"
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgetapi"
@@ -138,7 +139,7 @@ func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 	// Run the display.
 	termdash.Run(ctx, t, c, termdash.KeyboardSubscriber(
 		func(k *terminalapi.Keyboard) {
-			if k.Key == 'q' {
+			if k.Key == keyboard.KeyEsc {
 				cancel()
 				t.Close()
 				os.Exit(0)
@@ -327,7 +328,16 @@ func StreamResults() {
 	resultsView := tview.NewTextView().SetChangedFunc(
 		func() {
 			app.Draw()
-		})
+		}).SetDoneFunc(
+		func(key tcell.Key) {
+			switch key {
+			case tcell.KeyEscape:
+				// When a user presses Esc, close the application.
+				app.Stop()
+				os.Exit(0)
+			}
+		},
+	)
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	// Initialize the display.
@@ -336,7 +346,12 @@ func StreamResults() {
 	// Start the display.
 	display(
 		func() {
-			fmt.Fprintln(resultsView, results.Labels)
+			// Print labels as the first line, if they are present.
+			if len(results.Labels) > 0 {
+				fmt.Fprintln(resultsView, results.Labels)
+			}
+
+			// Print results.
 			for {
 				fmt.Fprintln(resultsView, (<-storage.PutEvents).Value)
 			}
@@ -423,7 +438,6 @@ func GraphResults() {
 		func() {
 			for {
 				next := <-storage.PutEvents
-
 				graph.Add([]int{int(100 * next.Values[9].(float64))})
 			}
 
