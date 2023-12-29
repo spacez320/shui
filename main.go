@@ -73,6 +73,16 @@ var (
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+// Parses a comma delimited argument string, returning a slice of strings if
+// any are found, or an empty slice if not.
+func parseCommaDelimitedArg(arg string) []string {
+	if parsed := strings.Split(arg, ","); parsed[0] == "" {
+		return []string{}
+	} else {
+		return parsed
+	}
+}
+
 func main() {
 	// Define arguments.
 
@@ -122,8 +132,8 @@ func main() {
 	if !silent {
 		lib.Results(
 			lib.ResultMode(resultMode),
-			strings.Split(valueLabels, ","),
-			strings.Split(filters, ","),
+			parseCommaDelimitedArg(valueLabels),
+			parseCommaDelimitedArg(filters),
 			lib.Config{
 				LogLevel: logLevel,
 			},

@@ -384,14 +384,16 @@ func TableResults() {
 	// Start the display.
 	display(
 		func() {
-			i := 1 // Used to determine the next row index. Starts at one because of the header row.
+			i := 0 // Used to determine the next row index.
 
 			// Populate header.
 			if len(results.Labels) > 0 {
 				headerRow := resultsView.InsertRow(i)
 				for j, label := range results.Labels {
-					headerRow.SetCellSimple(0, j, tableCellPadding+label+tableCellPadding)
+					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
 				}
+
+				i += 1
 			}
 
 			for {
@@ -416,8 +418,6 @@ func TableResults() {
 					row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
 				}
 
-				// Re-draw the app with the new results row.
-				app.Draw()
 				i += 1
 			}
 		},
@@ -428,7 +428,7 @@ func TableResults() {
 func GraphResults() {
 	// Initialize the results view.
 	graph, err := sparkline.New(
-		sparkline.Label("Test Sparkline", cell.FgColor(cell.ColorNumber(33))),
+		sparkline.Label("Results", cell.FgColor(cell.ColorNumber(33))),
 		sparkline.Color(cell.ColorGreen),
 	)
 	e(err)
@@ -440,8 +440,6 @@ func GraphResults() {
 				next := <-storage.PutEvents
 				graph.Add([]int{int(100 * next.Values[0].(float64))})
 			}
-
-			graph.Add([]int{1, 2, 3})
 		},
 	)
 
