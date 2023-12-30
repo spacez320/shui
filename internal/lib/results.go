@@ -87,22 +87,6 @@ var (
 	LogsView *tview.TextView
 )
 
-// Retrieve a result mode from an integer.
-func (ResultMode) Get(i int) (resultMode ResultMode) {
-	switch i {
-	case 1:
-		resultMode = RESULT_MODE_RAW
-	case 2:
-		resultMode = RESULT_MODE_STREAM
-	case 3:
-		resultMode = RESULT_MODE_TABLE
-	case 4:
-		resultMode = RESULT_MODE_GRAPH
-	}
-
-	return
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Private
