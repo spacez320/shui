@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/rivo/tview v0.0.0-20231206124440-5f078138442e
-	golang.org/x/exp v0.0.0-20231127185646-65229373498e
+	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b
 )
 
 require (

@@ -399,6 +399,7 @@ func TableResults(filters []string) {
 					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
 				}
 
+				app.Draw()
 				i += 1
 			}
 
@@ -423,6 +424,7 @@ func TableResults(filters []string) {
 					row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
 				}
 
+				app.Draw()
 				i += 1
 			}
 		},
