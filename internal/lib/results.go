@@ -355,6 +355,7 @@ func StreamResults() {
 func TableResults(filters []string) {
 	var (
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
+		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
 	)
 
 	// Initialize the results view.
@@ -369,18 +370,32 @@ func TableResults(filters []string) {
 		},
 	)
 
+	// Determine the value indexes to populate into the graph. If no filter is
+	// provided, the index is assumed to be zero.
+	if len(filters) > 0 {
+		for _, filter := range filters {
+			valueIndexes = append(valueIndexes, results.GetValueIndex(filter))
+		}
+	}
+
 	// Initialize the display.
 	initDisplayTview(resultsView, LogsView)
 
 	// Start the display.
 	display(
 		func() {
-			i := 0 // Used to determine the next row index.
+			var (
+				i = 0 // Used to determine the next row index.
+			)
 
-			// Populate header.
+			// Create the table header.
 			if len(results.Labels) > 0 {
+				// Labels to apply.
+				labels := FilterSlice(results.Labels, valueIndexes)
+				// Row to contain the labels.
 				headerRow := resultsView.InsertRow(i)
-				for j, label := range results.Labels {
+
+				for j, label := range labels {
 					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
 				}
 
@@ -388,24 +403,23 @@ func TableResults(filters []string) {
 			}
 
 			for {
-				// Retrieve the next result.
-				next := <-storage.PutEvents
-
-				// Display the new result.
+				// Retrieve specific next values.
+				values := FilterSlice((<-storage.PutEvents).Values, valueIndexes)
+				// Row to contain the result.
 				row := resultsView.InsertRow(i)
-				for j, token := range next.Values {
+
+				for j, value := range values {
 					var nextCellContent string
 
 					// Extrapolate the field types in order to print them out.
-					switch token.(type) {
+					switch value.(type) {
 					case int64:
-						nextCellContent = strconv.FormatInt(token.(int64), 10)
+						nextCellContent = strconv.FormatInt(value.(int64), 10)
 					case float64:
-						nextCellContent = strconv.FormatFloat(token.(float64), 'f', -1, 64)
+						nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
 					default:
-						nextCellContent = token.(string)
+						nextCellContent = value.(string)
 					}
-
 					row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
 				}
 
@@ -418,8 +432,7 @@ func TableResults(filters []string) {
 // Creates a graph of results for the results pane.
 func GraphResults(filters []string) {
 	var (
-		// Index of the result value to graph.
-		valueIndex = 0
+		valueIndex = 0 // Index of the result value to graph.
 	)
 
 	// Initialize the results view.
@@ -429,9 +442,8 @@ func GraphResults(filters []string) {
 	)
 	e(err)
 
-	// Determine the values indexes to populate into the graph. Only the first
-	// filter will be considered. If no filter is provided, the index is assumed
-	// to be zero.
+	// Determine the values to populate into the graph. If no filter is provided,
+	// the first value is taken.
 	if len(filters) > 0 {
 		valueIndex = results.GetValueIndex(filters[0])
 	}
@@ -440,13 +452,13 @@ func GraphResults(filters []string) {
 	display(
 		func() {
 			for {
-				nextValue := (<-storage.PutEvents).Values[valueIndex]
+				value := (<-storage.PutEvents).Values[valueIndex]
 
-				switch nextValue.(type) {
+				switch value.(type) {
 				case int64:
-					graph.Add([]int{int(nextValue.(int64))})
+					graph.Add([]int{int(value.(int64))})
 				case float64:
-					graph.Add([]int{int(nextValue.(float64))})
+					graph.Add([]int{int(value.(float64))})
 				}
 			}
 		},
