@@ -1,46 +1,67 @@
 //
 // Storage management for query results.
+//
+// The storage engine is a simple, time-series indexed, multi-type data store.
+// It interfaces as a Go library in a few ways, namely:
+//
+// - It can be used as a library.
+// - It can broadcast events into public Go channels.
+// - It can broadcast events via RPC.
+//
+// Results are stored simply in an ordered sequence, and querying time is
+// linear.
 
 package storage
 
 import (
 	"fmt"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Types
 //
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Individual result.
 type Result struct {
-	Time   time.Time
-	Value  interface{}
+	// Time the result was created.
+	Time time.Time
+	// Raw value of the result.
+	Value interface{}
+	// Tokenized value of the result.
 	Values []interface{}
 }
 
 // Collection of results.
-type Results []Result
+type Results struct {
+	// Meta field for result values acting as a name, corresponding by index.
+	Labels []string
+	// Stored results.
+	Results []Result
+}
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Variables
 //
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Channel for broadcasting Put calls.
 var PutEvents = make(chan Result, 128)
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Public
 //
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Get a result based on a timestamp.
 func (r *Results) Get(time time.Time) Result {
-	for _, result := range *r {
+	for _, result := range (*r).Results {
 		if result.Time.Compare(time) == 0 {
 			// We found a result to return.
 			return result
@@ -51,9 +72,14 @@ func (r *Results) Get(time time.Time) Result {
 	return Result{}
 }
 
+// Given a filter, return the corresponding value index.
+func (r *Results) GetValueIndex(filter string) int {
+	return slices.Index((*r).Labels, filter)
+}
+
 // Gets results based on a start and end timestamp.
 func (r *Results) GetRange(startTime time.Time, endTime time.Time) (found []Result) {
-	for _, result := range *r {
+	for _, result := range (*r).Results {
 		if result.Time.Compare(startTime) >= 0 {
 			if result.Time.Compare(endTime) > 0 {
 				// Break out of the loop if we've exhausted the upper bounds of the
@@ -76,7 +102,7 @@ func (r *Results) Put(value string, values ...interface{}) []interface{} {
 		Values: values,
 	}
 
-	*r = append(*r, next)
+	(*r).Results = append((*r).Results, next)
 	PutEvents <- next
 
 	return values
@@ -84,16 +110,17 @@ func (r *Results) Put(value string, values ...interface{}) []interface{} {
 
 // Show all currently stored results.
 func (r *Results) Show() {
-	for _, result := range *r {
-		fmt.Printf("Time: %v, Value: %v, Values: %v\n", result.Time, result.Value, result.Values)
+	for _, result := range (*r).Results {
+		fmt.Printf("Label: %v, Time: %v, Value: %v, Values: %v\n",
+			(*r).Labels, result.Time, result.Value, result.Values)
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // RPC
 //
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 type ArgsRPC struct{}
 
