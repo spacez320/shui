@@ -196,9 +196,7 @@ func FilterResult(result storage.Result, labels []string, filters []string) stor
 	}
 
 	// Filter the results.
-	for i, index := range labelIndexes {
-		resultValues[i] = result.Values[index]
-	}
+	resultValues = FilterSlice(result.Values, labelIndexes)
 
 	return storage.Result{
 		Time:   result.Time,
