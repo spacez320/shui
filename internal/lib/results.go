@@ -45,6 +45,17 @@ import (
 // Represents the display mode.
 type display_ int
 
+// Used to provide an io.Writer implementation of termdash text widgets.
+type termdashTextWriter struct {
+	text text.Text
+}
+
+// Implements io.Writer.
+func (t *termdashTextWriter) Write(p []byte) (n int, err error) {
+	t.text.Write(string(p))
+	return len(p), nil
+}
+
 // Represents the result mode value.
 type ResultMode int
 
@@ -84,6 +95,8 @@ const (
 var (
 	// Application for display. Only applicable for tview result modes.
 	app *tview.Application
+	// Global configuration.
+	config Config
 	// Display mode, dictated by the results.
 	mode display_
 	// Stored results.
@@ -99,20 +112,6 @@ var (
 // Private
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Set-up the sync for logs used by some result modes.
-func init() {
-	// Initialized specifically for showing logs in a tview pane. Currently,
-	// tview is the only supported display backend that supports logging, and
-	// termdash will not show logs.
-	//
-	// Initializing this is harmless, even if tview won't be used.
-	//
-	// TODO This should be probably be managed outside of init and should be made
-	// display mode agnostic.
-	LogsView = tview.NewTextView().SetChangedFunc(func() { app.Draw() })
-	LogsView.SetBorder(true).SetTitle("Logs")
-}
 
 // Sets-up the termdash container, which defines the overall layout, and begins
 // running the display.
@@ -309,7 +308,9 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Entry-point function for results.
-func Results(resultMode ResultMode, labels, filters []string, config Config) {
+func Results(resultMode ResultMode, labels, filters []string, inputConfig Config) {
+	// Assign global config.
+	config = inputConfig
 	// Set up labelling or any schema for the results store.
 	results.Labels = labels
 
@@ -318,12 +319,6 @@ func Results(resultMode ResultMode, labels, filters []string, config Config) {
 		mode = DISPLAY_RAW
 		RawResults()
 	case RESULT_MODE_STREAM:
-		// Pass logs into the logs view pane.
-		slog.SetDefault(slog.New(slog.NewTextHandler(
-			LogsView,
-			&slog.HandlerOptions{Level: config.SlogLogLevel()},
-		)))
-
 		mode = DISPLAY_TVIEW
 		StreamResults()
 	case RESULT_MODE_TABLE:
@@ -356,9 +351,10 @@ func RawResults() {
 // Update the results pane with new results as they are generated.
 func StreamResults() {
 	var (
-		helpText    = "(ESC) Quit"
-		helpView    = tview.NewTextView()
-		resultsView = tview.NewTextView()
+		helpText    = "(ESC) Quit"        // Text to display in the help pane.
+		helpView    = tview.NewTextView() // Help text container.
+		logsView    = tview.NewTextView() // Logs text container.
+		resultsView = tview.NewTextView() // Results container.
 	)
 
 	// Initialize the results view.
@@ -381,8 +377,15 @@ func StreamResults() {
 	helpView.SetBorder(true).SetTitle("Help")
 	fmt.Fprintln(helpView, helpText)
 
+	// Initialize the logs view.
+	logsView.SetBorder(true).SetTitle("Logs")
+	slog.SetDefault(slog.New(slog.NewTextHandler(
+		logsView,
+		&slog.HandlerOptions{Level: config.SlogLogLevel()},
+	)))
+
 	// Initialize the display.
-	initDisplayTview(resultsView, helpView, LogsView)
+	initDisplayTview(resultsView, helpView, logsView)
 
 	// Start the display.
 	display(
@@ -404,10 +407,11 @@ func StreamResults() {
 func TableResults(filters []string) {
 	var (
 		helpText         = "(ESC) Quit"                       // Text to display in the help pane.
+		helpView         = tview.NewTextView()                // Help text container.
+		logsView         = tview.NewTextView()                // Logs text container.
+		resultsView      = tview.NewTable()                   // Results container.
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
-		resultsView      = tview.NewTable()                   // Results container.
-		helpView         = tview.NewTextView()                // Help text container.
 	)
 
 	// Initialize the results view.
@@ -427,6 +431,13 @@ func TableResults(filters []string) {
 	helpView.SetBorder(true).SetTitle("Help")
 	fmt.Fprintln(helpView, helpText)
 
+	// Initialize the logs view.
+	logsView.SetBorder(true).SetTitle("Logs")
+	slog.SetDefault(slog.New(slog.NewTextHandler(
+		logsView,
+		&slog.HandlerOptions{Level: config.SlogLogLevel()},
+	)))
+
 	// Determine the value indexes to populate into the graph. If no filter is
 	// provided, the index is assumed to be zero.
 	if len(filters) > 0 {
@@ -436,7 +447,7 @@ func TableResults(filters []string) {
 	}
 
 	// Initialize the display.
-	initDisplayTview(resultsView, helpView, LogsView)
+	initDisplayTview(resultsView, helpView, logsView)
 
 	// Start the display.
 	display(
@@ -510,11 +521,17 @@ func GraphResults(filters []string) {
 
 	// Initialize the help view.
 	helpWidget, err := text.New()
+	e(err)
 	helpWidget.Write(helpText)
 
 	// Initialize the logs view.
 	logsWidget, err := text.New()
-	logsWidget.Write("This is the logs view.")
+	e(err)
+	logsWidgetWriter := termdashTextWriter{text: *logsWidget}
+	slog.SetDefault(slog.New(slog.NewTextHandler(
+		&logsWidgetWriter,
+		&slog.HandlerOptions{Level: config.SlogLogLevel()},
+	)))
 
 	// Start the display.
 	display(
@@ -534,5 +551,5 @@ func GraphResults(filters []string) {
 
 	// Initialize the display. This must happen after the display function is
 	// invoked, otherwise data will never appear.
-	initDisplayTermdash(resultWidget, helpWidget, logsWidget)
+	initDisplayTermdash(resultWidget, helpWidget, &logsWidgetWriter.text)
 }
