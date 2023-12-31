@@ -59,7 +59,7 @@ const (
 	OUTER_PADDING_RIGHT  = 10 // Right padding for the full display.
 	OUTER_PADDING_TOP    = 5  // Top padding for the full display.
 	OUTER_PADDING_BOTTOM = 5  // Bottom padding for the full display.
-	RESULTS_SIZE         = 10 // Proportional size of the results widget.
+	RESULTS_SIZE         = 12 // Proportional size of the results widget.
 	TABLE_PADDING        = 2  // Padding for table cell entries.
 )
 
@@ -337,8 +337,8 @@ func StreamResults() {
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	// Initialize the help view.
-	helpView.SetBorder(true)
-	fmt.Fprintln(helpView, "Controls: "+helpText)
+	helpView.SetBorder(true).SetTitle("Help")
+	fmt.Fprintln(helpView, helpText)
 
 	// Initialize the display.
 	initDisplayTview(resultsView, helpView, LogsView)
@@ -380,10 +380,11 @@ func TableResults(filters []string) {
 			}
 		},
 	)
+	resultsView.SetBorder(true).SetTitle("Results")
 
 	// Initialize the help view.
-	helpView.SetBorder(true)
-	fmt.Fprintln(helpView, "Controls: "+helpText)
+	helpView.SetBorder(true).SetTitle("Help")
+	fmt.Fprintln(helpView, helpText)
 
 	// Determine the value indexes to populate into the graph. If no filter is
 	// provided, the index is assumed to be zero.
