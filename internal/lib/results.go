@@ -25,6 +25,7 @@ import (
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/container"
 	"github.com/mum4k/termdash/keyboard"
+	"github.com/mum4k/termdash/linestyle"
 	termdashTcell "github.com/mum4k/termdash/terminal/tcell"
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgetapi"
@@ -53,13 +54,13 @@ type ResultMode int
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const (
-	HELP_SIZE            = 1  // Proportional size of the logs widget.
-	LOGS_SIZE            = 2  // Proportional size of the logs widget.
+	HELP_SIZE            = 10 // Proportional size of the logs widget.
+	LOGS_SIZE            = 15 // Proportional size of the logs widget.
 	OUTER_PADDING_LEFT   = 10 // Left padding for the full display.
 	OUTER_PADDING_RIGHT  = 10 // Right padding for the full display.
 	OUTER_PADDING_TOP    = 5  // Top padding for the full display.
 	OUTER_PADDING_BOTTOM = 5  // Bottom padding for the full display.
-	RESULTS_SIZE         = 12 // Proportional size of the results widget.
+	RESULTS_SIZE         = 75 // Proportional size of the results widget.
 	TABLE_PADDING        = 2  // Padding for table cell entries.
 )
 
@@ -112,7 +113,8 @@ func init() {
 	LogsView.SetBorder(true).SetTitle("Logs")
 }
 
-// Sets-up the termdash display and renders a widget.
+// Sets-up the termdash container, which defines the overall layout, and begins
+// running the display.
 func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 	// Set-up the context and enable it to close on key-press.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -122,7 +124,37 @@ func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 	e(err)
 
 	// Render the widget.
-	c, err := container.New(t, container.PlaceWidget(resultsWidget))
+	c, err := container.New(
+		t,
+		container.PaddingBottom(OUTER_PADDING_BOTTOM),
+		container.PaddingLeft(OUTER_PADDING_LEFT),
+		container.PaddingTop(OUTER_PADDING_TOP),
+		container.PaddingRight(OUTER_PADDING_RIGHT),
+		container.SplitHorizontal(
+			container.Top(
+				container.Border(linestyle.Light),
+				container.BorderTitle("Results"),
+				container.BorderTitleAlignCenter(),
+				container.PlaceWidget(resultsWidget),
+			),
+			container.Bottom(
+				container.SplitHorizontal(
+					container.Top(
+						container.Border(linestyle.Light),
+						container.BorderTitle("Help"),
+						container.BorderTitleAlignCenter(),
+					),
+					container.Bottom(
+						container.Border(linestyle.Light),
+						container.BorderTitle("Logs"),
+						container.BorderTitleAlignCenter(),
+					),
+					container.SplitOption(container.SplitPercent(getRelativePerc(RESULTS_SIZE, HELP_SIZE))),
+				),
+			),
+			container.SplitOption(container.SplitPercent(RESULTS_SIZE)),
+		),
+	)
 	e(err)
 
 	// Run the display.
@@ -138,11 +170,12 @@ func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 	))
 }
 
-// Sets-up the tview flex box with results and logs views, which defines the
-// overall layout.
+// Sets-up the tview flex box, which defines the overall layout.
 //
 // Note that the app needs to be run separately from initialization in the
-// coroutine display function.
+// coroutine display function. Note also that direct manipulation of the tview
+// Primitives as subclasses (like tview.Box) needs to happen outside this
+// function, as well.
 func initDisplayTview(
 	resultsView tview.Primitive,
 	helpView tview.Primitive,
@@ -157,10 +190,10 @@ func initDisplayTview(
 		AddItem(helpView, 0, HELP_SIZE, false).
 		AddItem(logsView, 0, LOGS_SIZE, false)
 	flexBox.SetBorderPadding(
-		OUTER_PADDING_LEFT,
-		OUTER_PADDING_RIGHT,
 		OUTER_PADDING_TOP,
 		OUTER_PADDING_BOTTOM,
+		OUTER_PADDING_LEFT,
+		OUTER_PADDING_RIGHT,
 	)
 	app.SetRoot(flexBox, true).SetFocus(resultsView)
 }
@@ -180,6 +213,15 @@ func display(f func()) {
 		// Start the termdash-specific display.
 		// Nothing to do, yet.
 	}
+}
+
+// Gives a new percentage based on globalRelativePerc after reducing by
+// limitingPerc.
+//
+// For example, given a three-way percentage split of 80/10/10, this function
+// will return 50 if given the arguments 80 and 10.
+func getRelativePerc(limitingPerc int, globalRelativePerc int) int {
+	return (100 * globalRelativePerc) / (100 - limitingPerc)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
