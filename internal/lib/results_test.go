@@ -8,6 +8,15 @@ import (
 	"pkg/storage"
 )
 
+func TestGetRelativePerc(t *testing.T) {
+	got := getRelativePerc(80, 10)
+	expected := 50
+
+	if got != expected {
+		t.Errorf("Got: %v Expected %v\n", got, expected)
+	}
+}
+
 func TestFilterResult(t *testing.T) {
 	var (
 		testResultValues         = make([]interface{}, 0)

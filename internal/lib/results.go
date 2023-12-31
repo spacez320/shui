@@ -25,10 +25,12 @@ import (
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/container"
 	"github.com/mum4k/termdash/keyboard"
+	"github.com/mum4k/termdash/linestyle"
 	termdashTcell "github.com/mum4k/termdash/terminal/tcell"
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgetapi"
 	"github.com/mum4k/termdash/widgets/sparkline"
+	"github.com/mum4k/termdash/widgets/text"
 	"github.com/rivo/tview"
 	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog"
@@ -43,6 +45,17 @@ import (
 // Represents the display mode.
 type display_ int
 
+// Used to provide an io.Writer implementation of termdash text widgets.
+type termdashTextWriter struct {
+	text text.Text
+}
+
+// Implements io.Writer.
+func (t *termdashTextWriter) Write(p []byte) (n int, err error) {
+	t.text.Write(string(p))
+	return len(p), nil
+}
+
 // Represents the result mode value.
 type ResultMode int
 
@@ -53,9 +66,14 @@ type ResultMode int
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const (
-	LOGS_SIZE     = 1 // Proportional size of the logs widget.
-	RESULTS_SIZE  = 3 // Proportional size of the results widget.
-	TABLE_PADDING = 2 // Padding for table cell entries.
+	HELP_SIZE            = 10 // Proportional size of the logs widget.
+	LOGS_SIZE            = 15 // Proportional size of the logs widget.
+	OUTER_PADDING_LEFT   = 10 // Left padding for the full display.
+	OUTER_PADDING_RIGHT  = 10 // Right padding for the full display.
+	OUTER_PADDING_TOP    = 5  // Top padding for the full display.
+	OUTER_PADDING_BOTTOM = 5  // Bottom padding for the full display.
+	RESULTS_SIZE         = 75 // Proportional size of the results widget.
+	TABLE_PADDING        = 2  // Padding for table cell entries.
 )
 
 // Display constants. Each result mode uses a specific display.
@@ -77,6 +95,8 @@ const (
 var (
 	// Application for display. Only applicable for tview result modes.
 	app *tview.Application
+	// Global configuration.
+	config Config
 	// Display mode, dictated by the results.
 	mode display_
 	// Stored results.
@@ -93,22 +113,9 @@ var (
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Set-up the sync for logs used by some result modes.
-func init() {
-	// Initialized specifically for showing logs in a tview pane. Currently,
-	// tview is the only supported display backend that supports logging, and
-	// termdash will not show logs.
-	//
-	// Initializing this is harmless, even if tview won't be used.
-	//
-	// TODO This should be probably be managed outside of init and should be made
-	// display mode agnostic.
-	LogsView = tview.NewTextView().SetChangedFunc(func() { app.Draw() })
-	LogsView.SetBorder(true).SetTitle("Logs")
-}
-
-// Sets-up the termdash display and renders a widget.
-func initDisplayTermdash(resultsWidget widgetapi.Widget) {
+// Sets-up the termdash container, which defines the overall layout, and begins
+// running the display.
+func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget) {
 	// Set-up the context and enable it to close on key-press.
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -117,7 +124,39 @@ func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 	e(err)
 
 	// Render the widget.
-	c, err := container.New(t, container.PlaceWidget(resultsWidget))
+	c, err := container.New(
+		t,
+		container.PaddingBottom(OUTER_PADDING_BOTTOM),
+		container.PaddingLeft(OUTER_PADDING_LEFT),
+		container.PaddingTop(OUTER_PADDING_TOP),
+		container.PaddingRight(OUTER_PADDING_RIGHT),
+		container.SplitHorizontal(
+			container.Top(
+				container.Border(linestyle.Light),
+				container.BorderTitle("Results"),
+				container.BorderTitleAlignCenter(),
+				container.PlaceWidget(resultsWidget),
+			),
+			container.Bottom(
+				container.SplitHorizontal(
+					container.Top(
+						container.Border(linestyle.Light),
+						container.BorderTitle("Help"),
+						container.BorderTitleAlignCenter(),
+						container.PlaceWidget(helpWidget),
+					),
+					container.Bottom(
+						container.Border(linestyle.Light),
+						container.BorderTitle("Logs"),
+						container.BorderTitleAlignCenter(),
+						container.PlaceWidget(logsWidget),
+					),
+					container.SplitOption(container.SplitPercent(getRelativePerc(RESULTS_SIZE, HELP_SIZE))),
+				),
+			),
+			container.SplitOption(container.SplitPercent(RESULTS_SIZE)),
+		),
+	)
 	e(err)
 
 	// Run the display.
@@ -133,19 +172,27 @@ func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 	))
 }
 
-// Sets-up the tview flex box with results and logs views, which defines the
-// overall layout.
+// Sets-up the tview flex box, which defines the overall layout.
 //
 // Note that the app needs to be run separately from initialization in the
-// coroutine display function.
-func initDisplayTview(resultsView tview.Primitive, logsView tview.Primitive) {
+// coroutine display function. Note also that direct manipulation of the tview
+// Primitives as subclasses (like tview.Box) needs to happen outside this
+// function, as well.
+func initDisplayTview(resultsView, helpView, logsView tview.Primitive) {
 	// Initialize the app.
 	app = tview.NewApplication()
 
 	// Set-up the layout and apply views.
 	flexBox := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(resultsView, 0, RESULTS_SIZE, false).
+		AddItem(helpView, 0, HELP_SIZE, false).
 		AddItem(logsView, 0, LOGS_SIZE, false)
+	flexBox.SetBorderPadding(
+		OUTER_PADDING_TOP,
+		OUTER_PADDING_BOTTOM,
+		OUTER_PADDING_LEFT,
+		OUTER_PADDING_RIGHT,
+	)
 	app.SetRoot(flexBox, true).SetFocus(resultsView)
 }
 
@@ -166,6 +213,15 @@ func display(f func()) {
 	}
 }
 
+// Gives a new percentage based on globalRelativePerc after reducing by
+// limitingPerc.
+//
+// For example, given a three-way percentage split of 80/10/10, this function
+// will return 50 if given the arguments 80 and 10.
+func getRelativePerc(limitingPerc, globalRelativePerc int) int {
+	return (100 * globalRelativePerc) / (100 - limitingPerc)
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Public
@@ -182,7 +238,7 @@ func AddResult(result string) {
 }
 
 // Creates a result with filtered values.
-func FilterResult(result storage.Result, labels []string, filters []string) storage.Result {
+func FilterResult(result storage.Result, labels, filters []string) storage.Result {
 	var (
 		// Indexes of labels from filters, corresponding to result values.
 		labelIndexes = make([]int, len(filters))
@@ -252,7 +308,9 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Entry-point function for results.
-func Results(resultMode ResultMode, labels []string, filters []string, config Config) {
+func Results(resultMode ResultMode, labels, filters []string, inputConfig Config) {
+	// Assign global config.
+	config = inputConfig
 	// Set up labelling or any schema for the results store.
 	results.Labels = labels
 
@@ -261,12 +319,6 @@ func Results(resultMode ResultMode, labels []string, filters []string, config Co
 		mode = DISPLAY_RAW
 		RawResults()
 	case RESULT_MODE_STREAM:
-		// Pass logs into the logs view pane.
-		slog.SetDefault(slog.New(slog.NewTextHandler(
-			LogsView,
-			&slog.HandlerOptions{Level: config.SlogLogLevel()},
-		)))
-
 		mode = DISPLAY_TVIEW
 		StreamResults()
 	case RESULT_MODE_TABLE:
@@ -298,8 +350,15 @@ func RawResults() {
 
 // Update the results pane with new results as they are generated.
 func StreamResults() {
+	var (
+		helpText    = "(ESC) Quit"        // Text to display in the help pane.
+		helpView    = tview.NewTextView() // Help text container.
+		logsView    = tview.NewTextView() // Logs text container.
+		resultsView = tview.NewTextView() // Results container.
+	)
+
 	// Initialize the results view.
-	resultsView := tview.NewTextView().SetChangedFunc(
+	resultsView.SetChangedFunc(
 		func() {
 			app.Draw()
 		}).SetDoneFunc(
@@ -314,8 +373,19 @@ func StreamResults() {
 	)
 	resultsView.SetBorder(true).SetTitle("Results")
 
+	// Initialize the help view.
+	helpView.SetBorder(true).SetTitle("Help")
+	fmt.Fprintln(helpView, helpText)
+
+	// Initialize the logs view.
+	logsView.SetBorder(true).SetTitle("Logs")
+	slog.SetDefault(slog.New(slog.NewTextHandler(
+		logsView,
+		&slog.HandlerOptions{Level: config.SlogLogLevel()},
+	)))
+
 	// Initialize the display.
-	initDisplayTview(resultsView, LogsView)
+	initDisplayTview(resultsView, helpView, logsView)
 
 	// Start the display.
 	display(
@@ -336,12 +406,16 @@ func StreamResults() {
 // Creates a table of results for the results pane.
 func TableResults(filters []string) {
 	var (
+		helpText         = "(ESC) Quit"                       // Text to display in the help pane.
+		helpView         = tview.NewTextView()                // Help text container.
+		logsView         = tview.NewTextView()                // Logs text container.
+		resultsView      = tview.NewTable()                   // Results container.
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
 	)
 
 	// Initialize the results view.
-	resultsView := tview.NewTable().SetBorders(true).SetDoneFunc(
+	resultsView.SetBorders(true).SetDoneFunc(
 		func(key tcell.Key) {
 			switch key {
 			case tcell.KeyEscape:
@@ -351,6 +425,18 @@ func TableResults(filters []string) {
 			}
 		},
 	)
+	resultsView.SetBorder(true).SetTitle("Results")
+
+	// Initialize the help view.
+	helpView.SetBorder(true).SetTitle("Help")
+	fmt.Fprintln(helpView, helpText)
+
+	// Initialize the logs view.
+	logsView.SetBorder(true).SetTitle("Logs")
+	slog.SetDefault(slog.New(slog.NewTextHandler(
+		logsView,
+		&slog.HandlerOptions{Level: config.SlogLogLevel()},
+	)))
 
 	// Determine the value indexes to populate into the graph. If no filter is
 	// provided, the index is assumed to be zero.
@@ -361,7 +447,7 @@ func TableResults(filters []string) {
 	}
 
 	// Initialize the display.
-	initDisplayTview(resultsView, LogsView)
+	initDisplayTview(resultsView, helpView, logsView)
 
 	// Start the display.
 	display(
@@ -416,21 +502,36 @@ func TableResults(filters []string) {
 // Creates a graph of results for the results pane.
 func GraphResults(filters []string) {
 	var (
-		valueIndex = 0 // Index of the result value to graph.
+		helpText   = "(ESC) Quit" // Text to display in the help pane.
+		valueIndex = 0            // Index of the result value to graph.
 	)
-
-	// Initialize the results view.
-	graph, err := sparkline.New(
-		sparkline.Label("Results"),
-		sparkline.Color(cell.ColorGreen),
-	)
-	e(err)
 
 	// Determine the values to populate into the graph. If no filter is provided,
 	// the first value is taken.
 	if len(filters) > 0 {
 		valueIndex = results.GetValueIndex(filters[0])
 	}
+
+	// Initialize the results view.
+	resultWidget, err := sparkline.New(
+		sparkline.Label(results.Labels[valueIndex]),
+		sparkline.Color(cell.ColorGreen),
+	)
+	e(err)
+
+	// Initialize the help view.
+	helpWidget, err := text.New()
+	e(err)
+	helpWidget.Write(helpText)
+
+	// Initialize the logs view.
+	logsWidget, err := text.New()
+	e(err)
+	logsWidgetWriter := termdashTextWriter{text: *logsWidget}
+	slog.SetDefault(slog.New(slog.NewTextHandler(
+		&logsWidgetWriter,
+		&slog.HandlerOptions{Level: config.SlogLogLevel()},
+	)))
 
 	// Start the display.
 	display(
@@ -440,9 +541,9 @@ func GraphResults(filters []string) {
 
 				switch value.(type) {
 				case int64:
-					graph.Add([]int{int(value.(int64))})
+					resultWidget.Add([]int{int(value.(int64))})
 				case float64:
-					graph.Add([]int{int(value.(float64))})
+					resultWidget.Add([]int{int(value.(float64))})
 				}
 			}
 		},
@@ -450,5 +551,5 @@ func GraphResults(filters []string) {
 
 	// Initialize the display. This must happen after the display function is
 	// invoked, otherwise data will never appear.
-	initDisplayTermdash(graph)
+	initDisplayTermdash(resultWidget, helpWidget, &logsWidgetWriter.text)
 }
