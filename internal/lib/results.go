@@ -30,6 +30,7 @@ import (
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgetapi"
 	"github.com/mum4k/termdash/widgets/sparkline"
+	"github.com/mum4k/termdash/widgets/text"
 	"github.com/rivo/tview"
 	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog"
@@ -115,7 +116,7 @@ func init() {
 
 // Sets-up the termdash container, which defines the overall layout, and begins
 // running the display.
-func initDisplayTermdash(resultsWidget widgetapi.Widget) {
+func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget) {
 	// Set-up the context and enable it to close on key-press.
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -143,11 +144,13 @@ func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 						container.Border(linestyle.Light),
 						container.BorderTitle("Help"),
 						container.BorderTitleAlignCenter(),
+						container.PlaceWidget(helpWidget),
 					),
 					container.Bottom(
 						container.Border(linestyle.Light),
 						container.BorderTitle("Logs"),
 						container.BorderTitleAlignCenter(),
+						container.PlaceWidget(logsWidget),
 					),
 					container.SplitOption(container.SplitPercent(getRelativePerc(RESULTS_SIZE, HELP_SIZE))),
 				),
@@ -176,11 +179,7 @@ func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 // coroutine display function. Note also that direct manipulation of the tview
 // Primitives as subclasses (like tview.Box) needs to happen outside this
 // function, as well.
-func initDisplayTview(
-	resultsView tview.Primitive,
-	helpView tview.Primitive,
-	logsView tview.Primitive,
-) {
+func initDisplayTview(resultsView, helpView, logsView tview.Primitive) {
 	// Initialize the app.
 	app = tview.NewApplication()
 
@@ -220,7 +219,7 @@ func display(f func()) {
 //
 // For example, given a three-way percentage split of 80/10/10, this function
 // will return 50 if given the arguments 80 and 10.
-func getRelativePerc(limitingPerc int, globalRelativePerc int) int {
+func getRelativePerc(limitingPerc, globalRelativePerc int) int {
 	return (100 * globalRelativePerc) / (100 - limitingPerc)
 }
 
@@ -240,7 +239,7 @@ func AddResult(result string) {
 }
 
 // Creates a result with filtered values.
-func FilterResult(result storage.Result, labels []string, filters []string) storage.Result {
+func FilterResult(result storage.Result, labels, filters []string) storage.Result {
 	var (
 		// Indexes of labels from filters, corresponding to result values.
 		labelIndexes = make([]int, len(filters))
@@ -310,7 +309,7 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Entry-point function for results.
-func Results(resultMode ResultMode, labels []string, filters []string, config Config) {
+func Results(resultMode ResultMode, labels, filters []string, config Config) {
 	// Set up labelling or any schema for the results store.
 	results.Labels = labels
 
@@ -492,21 +491,30 @@ func TableResults(filters []string) {
 // Creates a graph of results for the results pane.
 func GraphResults(filters []string) {
 	var (
-		valueIndex = 0 // Index of the result value to graph.
+		helpText   = "(ESC) Quit" // Text to display in the help pane.
+		valueIndex = 0            // Index of the result value to graph.
 	)
-
-	// Initialize the results view.
-	graph, err := sparkline.New(
-		sparkline.Label("Results"),
-		sparkline.Color(cell.ColorGreen),
-	)
-	e(err)
 
 	// Determine the values to populate into the graph. If no filter is provided,
 	// the first value is taken.
 	if len(filters) > 0 {
 		valueIndex = results.GetValueIndex(filters[0])
 	}
+
+	// Initialize the results view.
+	resultWidget, err := sparkline.New(
+		sparkline.Label(results.Labels[valueIndex]),
+		sparkline.Color(cell.ColorGreen),
+	)
+	e(err)
+
+	// Initialize the help view.
+	helpWidget, err := text.New()
+	helpWidget.Write(helpText)
+
+	// Initialize the logs view.
+	logsWidget, err := text.New()
+	logsWidget.Write("This is the logs view.")
 
 	// Start the display.
 	display(
@@ -516,9 +524,9 @@ func GraphResults(filters []string) {
 
 				switch value.(type) {
 				case int64:
-					graph.Add([]int{int(value.(int64))})
+					resultWidget.Add([]int{int(value.(int64))})
 				case float64:
-					graph.Add([]int{int(value.(float64))})
+					resultWidget.Add([]int{int(value.(float64))})
 				}
 			}
 		},
@@ -526,5 +534,5 @@ func GraphResults(filters []string) {
 
 	// Initialize the display. This must happen after the display function is
 	// invoked, otherwise data will never appear.
-	initDisplayTermdash(graph)
+	initDisplayTermdash(resultWidget, helpWidget, logsWidget)
 }
