@@ -53,9 +53,14 @@ type ResultMode int
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const (
-	LOGS_SIZE     = 1 // Proportional size of the logs widget.
-	RESULTS_SIZE  = 3 // Proportional size of the results widget.
-	TABLE_PADDING = 2 // Padding for table cell entries.
+	HELP_SIZE            = 1  // Proportional size of the logs widget.
+	LOGS_SIZE            = 2  // Proportional size of the logs widget.
+	OUTER_PADDING_LEFT   = 10 // Left padding for the full display.
+	OUTER_PADDING_RIGHT  = 10 // Right padding for the full display.
+	OUTER_PADDING_TOP    = 5  // Top padding for the full display.
+	OUTER_PADDING_BOTTOM = 5  // Bottom padding for the full display.
+	RESULTS_SIZE         = 10 // Proportional size of the results widget.
+	TABLE_PADDING        = 2  // Padding for table cell entries.
 )
 
 // Display constants. Each result mode uses a specific display.
@@ -138,14 +143,25 @@ func initDisplayTermdash(resultsWidget widgetapi.Widget) {
 //
 // Note that the app needs to be run separately from initialization in the
 // coroutine display function.
-func initDisplayTview(resultsView tview.Primitive, logsView tview.Primitive) {
+func initDisplayTview(
+	resultsView tview.Primitive,
+	helpView tview.Primitive,
+	logsView tview.Primitive,
+) {
 	// Initialize the app.
 	app = tview.NewApplication()
 
 	// Set-up the layout and apply views.
 	flexBox := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(resultsView, 0, RESULTS_SIZE, false).
+		AddItem(helpView, 0, HELP_SIZE, false).
 		AddItem(logsView, 0, LOGS_SIZE, false)
+	flexBox.SetBorderPadding(
+		OUTER_PADDING_LEFT,
+		OUTER_PADDING_RIGHT,
+		OUTER_PADDING_TOP,
+		OUTER_PADDING_BOTTOM,
+	)
 	app.SetRoot(flexBox, true).SetFocus(resultsView)
 }
 
@@ -298,8 +314,14 @@ func RawResults() {
 
 // Update the results pane with new results as they are generated.
 func StreamResults() {
+	var (
+		helpText    = "(ESC) Quit"
+		helpView    = tview.NewTextView()
+		resultsView = tview.NewTextView()
+	)
+
 	// Initialize the results view.
-	resultsView := tview.NewTextView().SetChangedFunc(
+	resultsView.SetChangedFunc(
 		func() {
 			app.Draw()
 		}).SetDoneFunc(
@@ -314,8 +336,12 @@ func StreamResults() {
 	)
 	resultsView.SetBorder(true).SetTitle("Results")
 
+	// Initialize the help view.
+	helpView.SetBorder(true)
+	fmt.Fprintln(helpView, "Controls: "+helpText)
+
 	// Initialize the display.
-	initDisplayTview(resultsView, LogsView)
+	initDisplayTview(resultsView, helpView, LogsView)
 
 	// Start the display.
 	display(
@@ -336,12 +362,15 @@ func StreamResults() {
 // Creates a table of results for the results pane.
 func TableResults(filters []string) {
 	var (
+		helpText         = "(ESC) Quit"                       // Text to display in the help pane.
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
+		resultsView      = tview.NewTable()                   // Results container.
+		helpView         = tview.NewTextView()                // Help text container.
 	)
 
 	// Initialize the results view.
-	resultsView := tview.NewTable().SetBorders(true).SetDoneFunc(
+	resultsView.SetBorders(true).SetDoneFunc(
 		func(key tcell.Key) {
 			switch key {
 			case tcell.KeyEscape:
@@ -352,6 +381,10 @@ func TableResults(filters []string) {
 		},
 	)
 
+	// Initialize the help view.
+	helpView.SetBorder(true)
+	fmt.Fprintln(helpView, "Controls: "+helpText)
+
 	// Determine the value indexes to populate into the graph. If no filter is
 	// provided, the index is assumed to be zero.
 	if len(filters) > 0 {
@@ -361,7 +394,7 @@ func TableResults(filters []string) {
 	}
 
 	// Initialize the display.
-	initDisplayTview(resultsView, LogsView)
+	initDisplayTview(resultsView, helpView, LogsView)
 
 	// Start the display.
 	display(
