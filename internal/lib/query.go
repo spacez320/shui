@@ -12,34 +12,6 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-// Entrypoint for 'query' mode.
-func Query(queries []string, attempts int, delay int, port string) chan int {
-	var (
-		done      = make(chan int, 1)             // Signals overall completion.
-		doneQuery = make(chan bool, len(queries)) // Signals query completions.
-	)
-
-	// Start the RPC server.
-	initServer(port)
-
-	// Execute the queries.
-	for _, query := range queries {
-		go runQuery(query, attempts, delay, doneQuery)
-	}
-
-	go func() {
-		// Wait for the queries to finish.
-		for i := 0; i < len(queries); i++ {
-			<-doneQuery
-		}
-
-		// Signal overall completion.
-		done <- 1
-	}()
-
-	return done
-}
-
 // Executes a query.
 func runQuery(query string, attempts int, delay int, doneQuery chan bool) {
 	// This loop executes as long as attempts has not been reached or
@@ -69,7 +41,7 @@ func runQuery(query string, attempts int, delay int, doneQuery chan bool) {
 		// Interpret results.
 		cmd_output, cmd_output_err := io.ReadAll(stdout)
 		e(cmd_output_err)
-		AddResult(string(cmd_output))
+		AddResult(query, string(cmd_output))
 		slog.Debug(fmt.Sprintf("Result is: \n%s\n", cmd_output))
 
 		// Clean-up.
@@ -82,4 +54,32 @@ func runQuery(query string, attempts int, delay int, doneQuery chan bool) {
 	}
 
 	doneQuery <- true // Signals that this query is finished.
+}
+
+// Entrypoint for 'query' mode.
+func Query(queries []string, attempts int, delay int, port string) chan int {
+	var (
+		done      = make(chan int, 1)             // Signals overall completion.
+		doneQuery = make(chan bool, len(queries)) // Signals query completions.
+	)
+
+	// Start the RPC server.
+	initServer(port)
+
+	// Execute the queries.
+	for _, query := range queries {
+		go runQuery(query, attempts, delay, doneQuery)
+	}
+
+	go func() {
+		// Wait for the queries to finish.
+		for i := 0; i < len(queries); i++ {
+			<-doneQuery
+		}
+
+		// Signal overall completion.
+		done <- 1
+	}()
+
+	return done
 }

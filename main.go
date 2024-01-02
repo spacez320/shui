@@ -20,7 +20,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 // Represents the mode value.
-type mode_ int
+type queryMode int
 
 // Queries provided as flags.
 type queries_ []string
@@ -42,8 +42,8 @@ func (q *queries_) Set(query string) error {
 
 // Mode constants.
 const (
-	MODE_QUERY mode_ = iota + 1 // For running in 'query' mode.
-	MODE_READ                   // For running in 'read' mode.
+	MODE_QUERY queryMode = iota + 1 // For running in 'query' mode.
+	MODE_READ                       // For running in 'read' mode.
 )
 
 var (
@@ -132,6 +132,7 @@ func main() {
 	if !silent {
 		lib.Results(
 			lib.ResultMode(resultMode),
+			queries[0], // TODO Until result modes support >1 query.
 			parseCommaDelimitedArg(valueLabels),
 			parseCommaDelimitedArg(filters),
 			lib.Config{

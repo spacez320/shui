@@ -14,7 +14,7 @@ import (
 
 // Establish the RPC server to allow access to stored results.
 func initServer(port string) {
-	rpc.Register(&results)
+	rpc.Register(&store)
 	rpc.HandleHTTP()
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
