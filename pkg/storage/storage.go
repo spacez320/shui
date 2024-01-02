@@ -53,8 +53,12 @@ type Storage map[string]*Results
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Channel for broadcasting Put calls.
-var PutEvents = make(chan Result, 128)
+const (
+	PUT_EVENT_CHANNEL_SIZE = 128 // Size of Put channels.
+)
+
+// Channels for broadcasting Put calls.
+var PutEvents = make(map[string](chan Result))
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -98,7 +102,7 @@ func (r *Results) getValueIndex(filter string) int {
 }
 
 // Put a new compound result.
-func (r *Results) put(value string, values ...interface{}) []interface{} {
+func (r *Results) put(value string, values ...interface{}) Result {
 	next := Result{
 		Time:   time.Now(),
 		Value:  value,
@@ -106,9 +110,8 @@ func (r *Results) put(value string, values ...interface{}) []interface{} {
 	}
 
 	(*r).Results = append((*r).Results, next)
-	PutEvents <- next
 
-	return values
+	return next
 }
 
 // Show all currently stored results.
@@ -155,13 +158,16 @@ func (s *Storage) NewResults(query string) {
 	if _, ok := (*s)[query]; !ok {
 		// This is a new query, initialize an empty results.
 		(*s)[query] = &Results{}
+		PutEvents[query] = make(chan Result, PUT_EVENT_CHANNEL_SIZE)
 	}
 }
 
 // Put a new compound result.
-func (s *Storage) Put(query string, value string, values ...interface{}) []interface{} {
+func (s *Storage) Put(query string, value string, values ...interface{}) Result {
 	s.NewResults(query)
-	return (*s)[query].put(value, values...)
+	result := (*s)[query].put(value, values...)
+	PutEvents[query] <- result
+	return result
 }
 
 // Assigns labels to a results series.

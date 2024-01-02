@@ -238,6 +238,11 @@ func AddResult(query, result string) {
 	store.Put(query, result, TokenizeResult(result)...)
 }
 
+// Retrieves a next result.
+func GetResult(query string) storage.Result {
+	return <-storage.PutEvents[query]
+}
+
 // Creates a result with filtered values.
 func FilterResult(result storage.Result, labels, filters []string) storage.Result {
 	var (
@@ -318,7 +323,7 @@ func Results(resultMode ResultMode, query string, labels, filters []string, inpu
 	switch resultMode {
 	case RESULT_MODE_RAW:
 		mode = DISPLAY_RAW
-		RawResults()
+		RawResults(query)
 	case RESULT_MODE_STREAM:
 		mode = DISPLAY_TVIEW
 		StreamResults(query)
@@ -341,10 +346,10 @@ func Results(resultMode ResultMode, query string, labels, filters []string, inpu
 }
 
 // Presents raw output.
-func RawResults() {
+func RawResults(query string) {
 	go func() {
 		for {
-			fmt.Println(<-storage.PutEvents)
+			fmt.Println(GetResult(query))
 		}
 	}()
 }
@@ -398,7 +403,7 @@ func StreamResults(query string) {
 
 			// Print results.
 			for {
-				fmt.Fprintln(resultsView, (<-storage.PutEvents).Value)
+				fmt.Fprintln(resultsView, (GetResult(query)).Value)
 			}
 		},
 	)
@@ -475,7 +480,7 @@ func TableResults(query string, filters []string) {
 			for {
 				/* slog.Debug(fmt.Sprintf("Receiving value %v", <-storage.PutEvents)) */
 				// Retrieve specific next values.
-				values := FilterSlice((<-storage.PutEvents).Values, valueIndexes)
+				values := FilterSlice((GetResult(query)).Values, valueIndexes)
 				// Row to contain the result.
 				row := resultsView.InsertRow(i)
 
@@ -539,7 +544,7 @@ func GraphResults(query string, filters []string) {
 	display(
 		func() {
 			for {
-				value := (<-storage.PutEvents).Values[valueIndex]
+				value := (GetResult(query)).Values[valueIndex]
 
 				switch value.(type) {
 				case int64:
