@@ -42,9 +42,6 @@ import (
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Represents the display mode.
-type display_ int
-
 // Used to provide an io.Writer implementation of termdash text widgets.
 type termdashTextWriter struct {
 	text text.Text
@@ -55,6 +52,9 @@ func (t *termdashTextWriter) Write(p []byte) (n int, err error) {
 	t.text.Write(string(p))
 	return len(p), nil
 }
+
+// Represents the display mode.
+type DisplayMode int
 
 // Represents the result mode value.
 type ResultMode int
@@ -78,9 +78,9 @@ const (
 
 // Display constants. Each result mode uses a specific display.
 const (
-	DISPLAY_RAW      display_ = iota + 1 // Used for direct output.
-	DISPLAY_TVIEW                        // Used when tview is the TUI driver.
-	DISPLAY_TERMDASH                     // Used when termdash is the TUI driver.
+	DISPLAY_RAW      DisplayMode = iota + 1 // Used for direct output.
+	DISPLAY_TVIEW                           // Used when tview is the TUI driver.
+	DISPLAY_TERMDASH                        // Used when termdash is the TUI driver.
 
 )
 
@@ -98,9 +98,10 @@ var (
 	// Global configuration.
 	config Config
 	// Display mode, dictated by the results.
-	mode display_
+	mode DisplayMode
+
 	// Stored results.
-	results storage.Results
+	store = storage.NewStorage()
 
 	// Widget for displaying logs. Publicly offered to allow log configuration.
 	// Only applicable for tview result modes.
@@ -232,9 +233,9 @@ func getRelativePerc(limitingPerc, globalRelativePerc int) int {
 //
 // TODO In the future, multiple result stores could be implemented by making
 // this a function of an interface.
-func AddResult(result string) {
+func AddResult(query, result string) {
 	result = strings.TrimSpace(result)
-	results.Put(result, TokenizeResult(result)...)
+	store.Put(query, result, TokenizeResult(result)...)
 }
 
 // Creates a result with filtered values.
@@ -308,11 +309,11 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Entry-point function for results.
-func Results(resultMode ResultMode, labels, filters []string, inputConfig Config) {
+func Results(resultMode ResultMode, query string, labels, filters []string, inputConfig Config) {
 	// Assign global config.
 	config = inputConfig
 	// Set up labelling or any schema for the results store.
-	results.Labels = labels
+	store.PutLabels(query, labels)
 
 	switch resultMode {
 	case RESULT_MODE_RAW:
@@ -320,7 +321,7 @@ func Results(resultMode ResultMode, labels, filters []string, inputConfig Config
 		RawResults()
 	case RESULT_MODE_STREAM:
 		mode = DISPLAY_TVIEW
-		StreamResults()
+		StreamResults(query)
 	case RESULT_MODE_TABLE:
 		// Pass logs into the logs view pane.
 		slog.SetDefault(slog.New(slog.NewTextHandler(
@@ -329,10 +330,10 @@ func Results(resultMode ResultMode, labels, filters []string, inputConfig Config
 		)))
 
 		mode = DISPLAY_TVIEW
-		TableResults(filters)
+		TableResults(query, filters)
 	case RESULT_MODE_GRAPH:
 		mode = DISPLAY_TERMDASH
-		GraphResults(filters)
+		GraphResults(query, filters)
 	default:
 		slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
 		os.Exit(1)
@@ -349,7 +350,7 @@ func RawResults() {
 }
 
 // Update the results pane with new results as they are generated.
-func StreamResults() {
+func StreamResults(query string) {
 	var (
 		helpText    = "(ESC) Quit"        // Text to display in the help pane.
 		helpView    = tview.NewTextView() // Help text container.
@@ -391,8 +392,8 @@ func StreamResults() {
 	display(
 		func() {
 			// Print labels as the first line, if they are present.
-			if len(results.Labels) > 0 {
-				fmt.Fprintln(resultsView, results.Labels)
+			if labels := store.GetLabels(query); len(labels) > 0 {
+				fmt.Fprintln(resultsView, labels)
 			}
 
 			// Print results.
@@ -404,7 +405,7 @@ func StreamResults() {
 }
 
 // Creates a table of results for the results pane.
-func TableResults(filters []string) {
+func TableResults(query string, filters []string) {
 	var (
 		helpText         = "(ESC) Quit"                       // Text to display in the help pane.
 		helpView         = tview.NewTextView()                // Help text container.
@@ -442,7 +443,7 @@ func TableResults(filters []string) {
 	// provided, the index is assumed to be zero.
 	if len(filters) > 0 {
 		for _, filter := range filters {
-			valueIndexes = append(valueIndexes, results.GetValueIndex(filter))
+			valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
 		}
 	}
 
@@ -457,9 +458,9 @@ func TableResults(filters []string) {
 			)
 
 			// Create the table header.
-			if len(results.Labels) > 0 {
+			if labels := store.GetLabels(query); len(labels) > 0 {
 				// Labels to apply.
-				labels := FilterSlice(results.Labels, valueIndexes)
+				labels = FilterSlice(labels, valueIndexes)
 				// Row to contain the labels.
 				headerRow := resultsView.InsertRow(i)
 
@@ -472,6 +473,7 @@ func TableResults(filters []string) {
 			}
 
 			for {
+				/* slog.Debug(fmt.Sprintf("Receiving value %v", <-storage.PutEvents)) */
 				// Retrieve specific next values.
 				values := FilterSlice((<-storage.PutEvents).Values, valueIndexes)
 				// Row to contain the result.
@@ -500,7 +502,7 @@ func TableResults(filters []string) {
 }
 
 // Creates a graph of results for the results pane.
-func GraphResults(filters []string) {
+func GraphResults(query string, filters []string) {
 	var (
 		helpText   = "(ESC) Quit" // Text to display in the help pane.
 		valueIndex = 0            // Index of the result value to graph.
@@ -509,12 +511,12 @@ func GraphResults(filters []string) {
 	// Determine the values to populate into the graph. If no filter is provided,
 	// the first value is taken.
 	if len(filters) > 0 {
-		valueIndex = results.GetValueIndex(filters[0])
+		valueIndex = store.GetValueIndex(query, filters[0])
 	}
 
 	// Initialize the results view.
 	resultWidget, err := sparkline.New(
-		sparkline.Label(results.Labels[valueIndex]),
+		sparkline.Label(store.GetLabels(query)[valueIndex]),
 		sparkline.Color(cell.ColorGreen),
 	)
 	e(err)
