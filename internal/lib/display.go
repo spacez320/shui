@@ -81,7 +81,7 @@ func RawDisplay(query string) {
 // Update the results pane with new results as they are generated.
 func StreamDisplay(query string) {
 	var (
-		helpText = "(ESC) Quit" // Text to display in the help pane.
+		helpText = "(ESC) Quit | (n) Next Query" // Text to display in the help pane.
 	)
 
 	// Initialize the display.
