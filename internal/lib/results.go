@@ -19,7 +19,6 @@ import (
 
 	"pkg/storage"
 
-	"github.com/rivo/tview"
 	"golang.org/x/exp/slices"
 	"golang.org/x/exp/slog"
 )
@@ -47,7 +46,6 @@ const (
 	DISPLAY_RAW      DisplayMode = iota + 1 // Used for direct output.
 	DISPLAY_TVIEW                           // Used when tview is the TUI driver.
 	DISPLAY_TERMDASH                        // Used when termdash is the TUI driver.
-
 )
 
 // Result mode constants.
@@ -59,13 +57,9 @@ const (
 )
 
 var (
-	// Global configuration.
-	config Config
-	// Display mode, dictated by the results.
-	mode DisplayMode
+	config Config      // Global configuration.
+	mode   DisplayMode // Display mode, dictated by the results.
 
-	// Application for display. Only applicable for tview result modes.
-	app = tview.NewApplication()
 	// Stored results.
 	store = storage.NewStorage()
 )

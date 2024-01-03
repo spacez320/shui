@@ -111,9 +111,6 @@ func TableDisplay(query string, filters []string) {
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
 	)
 
-	// Initialize the display.
-	resultsView, _, _ := initDisplayTviewTable(helpText)
-
 	// Determine the value indexes to populate into the graph. If no filter is
 	// provided, the index is assumed to be zero.
 	if len(filters) > 0 {
@@ -121,6 +118,9 @@ func TableDisplay(query string, filters []string) {
 			valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
 		}
 	}
+
+	// Initialize the display.
+	resultsView, _, _ := initDisplayTviewTable(helpText)
 
 	// Start the display.
 	display(

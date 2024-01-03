@@ -12,10 +12,17 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+var (
+	app = tview.NewApplication()
+)
+
 // Display init function specific to table results.
 func initDisplayTviewTable(helpText string) (resultsView *tview.Table, helpView, logsView *tview.TextView) {
-	// Initialize the results view.
 	resultsView = tview.NewTable()
+	helpView = tview.NewTextView()
+	logsView = tview.NewTextView()
+
+	// Initialize the results view.
 	resultsView.SetBorders(true).SetDoneFunc(
 		func(key tcell.Key) {
 			switch key {
@@ -28,15 +35,18 @@ func initDisplayTviewTable(helpText string) (resultsView *tview.Table, helpView,
 	)
 	resultsView.SetBorder(true).SetTitle("Results")
 
-	helpView, logsView = initDisplayTview(resultsView, helpText)
+	initDisplayTview(resultsView, helpView, logsView, helpText)
 
 	return
 }
 
 // Display init function specific to text results.
 func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tview.TextView) {
-	// Initialize the results view.
 	resultsView = tview.NewTextView()
+	helpView = tview.NewTextView()
+	logsView = tview.NewTextView()
+
+	// Initialize the results view.
 	resultsView.SetChangedFunc(
 		func() {
 			app.Draw()
@@ -52,7 +62,7 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 	)
 	resultsView.SetBorder(true).SetTitle("Results")
 
-	helpView, logsView = initDisplayTview(resultsView, helpText)
+	initDisplayTview(resultsView, helpView, logsView, helpText)
 
 	return
 }
@@ -65,13 +75,11 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 // coroutine display function. Note also that direct manipulation of the tview
 // Primitives as subclasses (like tview.Box) needs to happen outside this
 // function, as well.
-func initDisplayTview(resultsView tview.Primitive, helpText string) (helpView, logsView *tview.TextView) {
+func initDisplayTview(resultsView tview.Primitive, helpView, logsView *tview.TextView, helpText string) {
 	var (
+		app     = tview.NewApplication()
 		flexBox = tview.NewFlex()
 	)
-
-	helpView = tview.NewTextView()
-	logsView = tview.NewTextView()
 
 	// Set-up the layout and apply views.
 	flexBox = flexBox.SetDirection(tview.FlexRow).
@@ -96,6 +104,4 @@ func initDisplayTview(resultsView tview.Primitive, helpText string) (helpView, l
 		logsView,
 		&slog.HandlerOptions{Level: config.SlogLogLevel()},
 	)))
-
-	return helpView, logsView
 }
