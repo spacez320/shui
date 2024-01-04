@@ -16,9 +16,36 @@ import (
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
+// Types
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Represents the display driver.
+type DisplayDriver int
+
+// Represents the display mode.
+type DisplayMode int
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // Variables
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Display driver constants. Each display mode uses a specific display driver.
+const (
+	DISPLAY_RAW      DisplayDriver = iota + 1 // Used for direct output.
+	DISPLAY_TVIEW                             // Used when tview is the TUI driver.
+	DISPLAY_TERMDASH                          // Used when termdash is the TUI driver.
+)
+
+// Display mode constants.
+const (
+	DISPLAY_MODE_RAW    DisplayMode = iota + 1 // For running in 'raw' display mode.
+	DISPLAY_MODE_STREAM                        // For running in 'stream' display mode.
+	DISPLAY_MODE_TABLE                         // For running in 'table' display mode.
+	DISPLAY_MODE_GRAPH                         // For running in 'graph' display mode.
+)
 
 const (
 	HELP_SIZE            = 10 // Proportional size of the logs widget.
@@ -31,19 +58,30 @@ const (
 	TABLE_PADDING        = 2  // Padding for table cell entries.
 )
 
+var (
+	activeDisplayModes = []DisplayMode{
+		DISPLAY_MODE_RAW,
+		DISPLAY_MODE_STREAM,
+		DISPLAY_MODE_TABLE,
+		DISPLAY_MODE_GRAPH,
+	} // Display modes considered for use in the current session.
+	interruptChan = make(chan bool) // Channel used to interrupt displays.
+)
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Private
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Starts the display. Expects a function to execute within a goroutine to
-// update the display.
-func display(f func()) {
+// Starts the display. Applies contextual logic depending on the provided
+// display driver. Expects a function to execute within a goroutine to update
+// the display.
+func display(driver DisplayDriver, f func()) {
 	// Execute the update function.
 	go func() { f() }()
 
-	switch mode {
+	switch driver {
 	case DISPLAY_TVIEW:
 		// Start the tview-specific display.
 		err := app.Run()
@@ -52,15 +90,6 @@ func display(f func()) {
 		// Start the termdash-specific display.
 		// Nothing to do, yet.
 	}
-}
-
-// Gives a new percentage based on globalRelativePerc after reducing by
-// limitingPerc.
-//
-// For example, given a three-way percentage split of 80/10/10, this function
-// will return 50 if given the arguments 80 and 10.
-func getRelativePerc(limitingPerc, globalRelativePerc int) int {
-	return (100 * globalRelativePerc) / (100 - limitingPerc)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,14 +110,17 @@ func RawDisplay(query string) {
 // Update the results pane with new results as they are generated.
 func StreamDisplay(query string) {
 	var (
-		helpText = "(ESC) Quit | (n) Next Query" // Text to display in the help pane.
+		helpText = "(ESC) Quit | (TAB) Next Query" // Text to display in the help pane.
 	)
+
+	helpText += fmt.Sprintf("\nQuery: %v", query)
 
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewText(helpText)
 
 	// Start the display.
 	display(
+		DISPLAY_TVIEW,
 		func() {
 			// Print labels as the first line, if they are present.
 			if labels := store.GetLabels(query); len(labels) > 0 {
@@ -97,7 +129,13 @@ func StreamDisplay(query string) {
 
 			// Print results.
 			for {
-				fmt.Fprintln(resultsView, (GetResult(query)).Value)
+				select {
+				case <-interruptChan:
+					// We've received a done signal and should interrupt the display.
+					return
+				default:
+					fmt.Fprintln(resultsView, (GetResult(query)).Value)
+				}
 			}
 		},
 	)
@@ -124,6 +162,7 @@ func TableDisplay(query string, filters []string) {
 
 	// Start the display.
 	display(
+		DISPLAY_TVIEW,
 		func() {
 			var (
 				i = 0 // Used to determine the next row index.
@@ -209,6 +248,7 @@ func GraphDisplay(query string, filters []string) {
 
 	// Start the display.
 	display(
+		DISPLAY_TERMDASH,
 		func() {
 			for {
 				value := (GetResult(query)).Values[valueIndex]

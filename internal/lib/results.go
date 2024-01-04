@@ -10,6 +10,7 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -25,44 +26,29 @@ import (
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Types
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Represents the display mode.
-type DisplayMode int
-
-// Represents the result mode value.
-type ResultMode int
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
 // Variables
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Display constants. Each result mode uses a specific display.
-const (
-	DISPLAY_RAW      DisplayMode = iota + 1 // Used for direct output.
-	DISPLAY_TVIEW                           // Used when tview is the TUI driver.
-	DISPLAY_TERMDASH                        // Used when termdash is the TUI driver.
-)
-
-// Result mode constants.
-const (
-	RESULT_MODE_RAW    ResultMode = iota + 1 // For running in 'raw' result mode.
-	RESULT_MODE_STREAM                       // For running in 'stream' result mode.
-	RESULT_MODE_TABLE                        // For running in 'table' result mode.
-	RESULT_MODE_GRAPH                        // For running in 'graph' result mode.
-)
-
 var (
-	config Config      // Global configuration.
-	mode   DisplayMode // Display mode, dictated by the results.
+	config     Config          // Global configuration.
+	currentCtx context.Context // Current context.
+	driver     DisplayDriver   // Display driver, dictated by the results.
 
-	// Stored results.
-	store = storage.NewStorage()
+	ctxDefaults = map[string]interface{}{
+		"advanceDisplayMode": false,
+		"advanceQuery":       false,
+		"quit":               false,
+	} // Defaults applied to context.
+	store = storage.NewStorage() // Stored results.
 )
+
+// Resets the current context to its default values.
+func resetContext() {
+	for k, v := range ctxDefaults {
+		currentCtx = context.WithValue(currentCtx, k, v)
+	}
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -143,27 +129,57 @@ func TokenizeResult(result string) (parsedResult []interface{}) {
 }
 
 // Entry-point function for results.
-func Results(resultMode ResultMode, query string, labels, filters []string, inputConfig Config) {
+func Results(
+	ctx context.Context,
+	displayMode DisplayMode,
+	query string,
+	labels, filters []string,
+	inputConfig Config,
+) {
 	// Assign global config.
 	config = inputConfig
-	// Set up labelling or any schema for the results store.
-	store.PutLabels(query, labels)
 
-	switch resultMode {
-	case RESULT_MODE_RAW:
-		mode = DISPLAY_RAW
-		RawDisplay(query)
-	case RESULT_MODE_STREAM:
-		mode = DISPLAY_TVIEW
-		StreamDisplay(query)
-	case RESULT_MODE_TABLE:
-		mode = DISPLAY_TVIEW
-		TableDisplay(query, filters)
-	case RESULT_MODE_GRAPH:
-		mode = DISPLAY_TERMDASH
-		GraphDisplay(query, filters)
-	default:
-		slog.Error(fmt.Sprintf("Invalid result mode: %d\n", resultMode))
-		os.Exit(1)
+	for {
+		// Assign current context and restore default values.
+		currentCtx = ctx
+		resetContext()
+
+		// Set up labelling or any schema for the results store.
+		store.PutLabels(query, labels)
+
+		switch displayMode {
+		case DISPLAY_MODE_RAW:
+			driver = DISPLAY_RAW
+			RawDisplay(query)
+		case DISPLAY_MODE_STREAM:
+			driver = DISPLAY_TVIEW
+			StreamDisplay(query)
+		case DISPLAY_MODE_TABLE:
+			driver = DISPLAY_TVIEW
+			TableDisplay(query, filters)
+		case DISPLAY_MODE_GRAPH:
+			driver = DISPLAY_TERMDASH
+			GraphDisplay(query, filters)
+		default:
+			slog.Error(fmt.Sprintf("Invalid result driver: %d\n", displayMode))
+			os.Exit(1)
+		}
+
+		// If we get here, it's because the display functions have returned, probably
+		// because of an interrupt. Assuming we haven't reached some other terminal
+		// situation, restart the results display, adjusting for context.
+
+		if currentCtx.Value("quit").(bool) {
+			// Guess I'll die.
+			os.Exit(0)
+		}
+		if currentCtx.Value("advanceDisplayMode").(bool) {
+			// Adjust the display mode.
+			displayMode = GetNextSliceRing(activeDisplayModes, displayMode)
+		}
+		if currentCtx.Value("advanceQuery").(bool) {
+			// Adjust the query.
+			query = GetNextSliceRing(ctx.Value("queries").([]string), query)
+		}
 	}
 }

@@ -4,8 +4,8 @@
 package lib
 
 import (
+	"context"
 	"fmt"
-	"os"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -13,26 +13,36 @@ import (
 )
 
 var (
-	app = tview.NewApplication()
+	app = tview.NewApplication() // Tview application.
 )
 
+// Function to call on 'done' events.
+func doneTview(key tcell.Key) {
+	switch key {
+	case tcell.KeyEscape:
+		// When a user presses Esc, close the application.
+		interruptChan <- true
+		currentCtx = context.WithValue(currentCtx, "quit", true)
+		app.Stop()
+	case tcell.KeyTab:
+		// When a user presses Tab, stop the display but continue running.
+		interruptChan <- true
+		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
+		app.Stop()
+	}
+}
+
 // Display init function specific to table results.
-func initDisplayTviewTable(helpText string) (resultsView *tview.Table, helpView, logsView *tview.TextView) {
+func initDisplayTviewTable(helpText string) (
+	resultsView *tview.Table,
+	helpView, logsView *tview.TextView,
+) {
 	resultsView = tview.NewTable()
 	helpView = tview.NewTextView()
 	logsView = tview.NewTextView()
 
 	// Initialize the results view.
-	resultsView.SetBorders(true).SetDoneFunc(
-		func(key tcell.Key) {
-			switch key {
-			case tcell.KeyEscape:
-				// When a user presses Esc, close the application.
-				app.Stop()
-				os.Exit(0)
-			}
-		},
-	)
+	resultsView.SetBorders(true).SetDoneFunc(doneTview)
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	initDisplayTview(resultsView, helpView, logsView, helpText)
@@ -50,16 +60,7 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 	resultsView.SetChangedFunc(
 		func() {
 			app.Draw()
-		}).SetDoneFunc(
-		func(key tcell.Key) {
-			switch key {
-			case tcell.KeyEscape:
-				// When a user presses Esc, close the application.
-				app.Stop()
-				os.Exit(0)
-			}
-		},
-	)
+		}).SetDoneFunc(doneTview)
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	initDisplayTview(resultsView, helpView, logsView, helpText)
@@ -75,10 +76,13 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 // coroutine display function. Note also that direct manipulation of the tview
 // Primitives as subclasses (like tview.Box) needs to happen outside this
 // function, as well.
-func initDisplayTview(resultsView tview.Primitive, helpView, logsView *tview.TextView, helpText string) {
+func initDisplayTview(
+	resultsView tview.Primitive,
+	helpView, logsView *tview.TextView,
+	helpText string,
+) {
 	var (
-		app     = tview.NewApplication()
-		flexBox = tview.NewFlex()
+		flexBox = tview.NewFlex() // Tview flexbox.
 	)
 
 	// Set-up the layout and apply views.

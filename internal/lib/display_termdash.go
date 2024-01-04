@@ -78,7 +78,7 @@ func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget)
 						container.BorderTitleAlignCenter(),
 						container.PlaceWidget(logsWidget),
 					),
-					container.SplitOption(container.SplitPercent(getRelativePerc(RESULTS_SIZE, HELP_SIZE))),
+					container.SplitOption(container.SplitPercent(RelativePerc(RESULTS_SIZE, HELP_SIZE))),
 				),
 			),
 			container.SplitOption(container.SplitPercent(RESULTS_SIZE)),
