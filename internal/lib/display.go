@@ -65,7 +65,6 @@ var (
 		DISPLAY_MODE_TABLE,
 		DISPLAY_MODE_GRAPH,
 	} // Display modes considered for use in the current session.
-	interruptChan = make(chan bool) // Channel used to interrupt displays.
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,14 +128,7 @@ func StreamDisplay(query string) {
 
 			// Print results.
 			for {
-				select {
-				case <-interruptChan:
-					// We've received a done signal and should interrupt the display.
-					slog.Debug("Received and interrupt.")
-					return
-				default:
-					fmt.Fprintln(resultsView, (GetResult(query)).Value)
-				}
+				fmt.Fprintln(resultsView, (GetResult(query)).Value)
 			}
 		},
 	)
@@ -187,35 +179,28 @@ func TableDisplay(query string, filters []string) {
 			}
 
 			for {
-				select {
-				case <-interruptChan:
-					// We've received a done signal and should interrupt the display.
-					slog.Debug("Received an interrupt.")
-					return
-				default:
-					// Retrieve specific next values.
-					values := FilterSlice((GetResult(query)).Values, valueIndexes)
-					// Row to contain the result.
-					row := resultsView.InsertRow(i)
+				values := FilterSlice((GetResult(query)).Values, valueIndexes)
+				// Row to contain the result.
+				row := resultsView.InsertRow(i)
 
-					for j, value := range values {
-						var nextCellContent string
+				for j, value := range values {
+					var nextCellContent string
 
-						// Extrapolate the field types in order to print them out.
-						switch value.(type) {
-						case int64:
-							nextCellContent = strconv.FormatInt(value.(int64), 10)
-						case float64:
-							nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
-						default:
-							nextCellContent = value.(string)
-						}
-						row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
+					// Extrapolate the field types in order to print them out.
+					switch value.(type) {
+					case int64:
+						nextCellContent = strconv.FormatInt(value.(int64), 10)
+					case float64:
+						nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
+					default:
+						nextCellContent = value.(string)
 					}
-
-					appTview.Draw()
-					i += 1
+					row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
 				}
+
+				appTview.Draw()
+				i += 1
+				// }
 			}
 		},
 	)
@@ -260,20 +245,13 @@ func GraphDisplay(query string, filters []string) {
 		DISPLAY_TERMDASH,
 		func() {
 			for {
-				select {
-				case <-interruptChan:
-					// We've received a done signal and should interrupt the display.
-					slog.Debug("Received an interrupt.")
-					return
-				default:
-					value := (GetResult(query)).Values[valueIndex]
+				value := (GetResult(query)).Values[valueIndex]
 
-					switch value.(type) {
-					case int64:
-						resultWidget.Add([]int{int(value.(int64))})
-					case float64:
-						resultWidget.Add([]int{int(value.(float64))})
-					}
+				switch value.(type) {
+				case int64:
+					resultWidget.Add([]int{int(value.(int64))})
+				case float64:
+					resultWidget.Add([]int{int(value.(float64))})
 				}
 			}
 		},

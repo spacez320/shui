@@ -21,18 +21,14 @@ var (
 func keyboardTviewHandler(key tcell.Key) {
 	switch key {
 	case tcell.KeyEscape:
-		slog.Debug("User pressed ESC.")
 		// When a user presses Esc, close the application.
-		interruptChan <- true
-		slog.Debug("Proceeding with escape handler ...")
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		appTview.Stop()
 		os.Exit(0)
-		// case tcell.KeyTab:
-		// 	// When a user presses Tab, stop the display but continue running.
-		// 	interruptChan <- true
-		// 	currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
-		// 	appTview.Stop()
+	case tcell.KeyTab:
+		// When a user presses Tab, stop the display but continue running.
+		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
+		appTview.Stop()
 	}
 }
 
