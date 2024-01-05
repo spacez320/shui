@@ -13,22 +13,22 @@ import (
 )
 
 var (
-	app = tview.NewApplication() // Tview application.
+	appTview = tview.NewApplication() // Tview application.
 )
 
 // Function to call on 'done' events.
-func doneTview(key tcell.Key) {
+func keyboardTviewHandler(key tcell.Key) {
 	switch key {
 	case tcell.KeyEscape:
 		// When a user presses Esc, close the application.
 		interruptChan <- true
 		currentCtx = context.WithValue(currentCtx, "quit", true)
-		app.Stop()
+		appTview.Stop()
 	case tcell.KeyTab:
 		// When a user presses Tab, stop the display but continue running.
 		interruptChan <- true
 		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
-		app.Stop()
+		appTview.Stop()
 	}
 }
 
@@ -42,7 +42,7 @@ func initDisplayTviewTable(helpText string) (
 	logsView = tview.NewTextView()
 
 	// Initialize the results view.
-	resultsView.SetBorders(true).SetDoneFunc(doneTview)
+	resultsView.SetBorders(true).SetDoneFunc(keyboardTviewHandler)
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	initDisplayTview(resultsView, helpView, logsView, helpText)
@@ -59,8 +59,8 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 	// Initialize the results view.
 	resultsView.SetChangedFunc(
 		func() {
-			app.Draw()
-		}).SetDoneFunc(doneTview)
+			appTview.Draw()
+		}).SetDoneFunc(keyboardTviewHandler)
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	initDisplayTview(resultsView, helpView, logsView, helpText)
@@ -96,7 +96,7 @@ func initDisplayTview(
 		OUTER_PADDING_LEFT,
 		OUTER_PADDING_RIGHT,
 	)
-	app.SetRoot(flexBox, true).SetFocus(resultsView)
+	appTview.SetRoot(flexBox, true).SetFocus(resultsView)
 
 	// Initialize the help view.
 	helpView.SetBorder(true).SetTitle("Help")

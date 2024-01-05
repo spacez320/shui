@@ -17,12 +17,6 @@ import (
 	"github.com/mum4k/termdash/widgets/text"
 )
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Types
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
 // Used to provide an io.Writer implementation of termdash text widgets.
 type termdashTextWriter struct {
 	text text.Text
@@ -34,25 +28,39 @@ func (t *termdashTextWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Private
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+var (
+	appTermdash *tcell.Terminal    // Termdash display.
+	cancel      context.CancelFunc // Cancel function for the termdash display.
+)
+
+func keyboardTermdashHandler(key *terminalapi.Keyboard) {
+	switch key.Key {
+	case keyboard.KeyEsc:
+		// When a user presses Esc, close the application.
+		cancel()
+		appTermdash.Close()
+		os.Exit(0)
+	}
+}
 
 // Sets-up the termdash container, which defines the overall layout, and begins
 // running the display.
 func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget) {
+	var (
+		ctx context.Context // Termdash specific context.
+		err error           // General error holder.
+	)
+
 	// Set-up the context and enable it to close on key-press.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithCancel(context.Background())
 
 	// Set-up the layout.
-	t, err := tcell.New()
+	appTermdash, err = tcell.New()
 	e(err)
 
 	// Render the widget.
 	c, err := container.New(
-		t,
+		appTermdash,
 		container.PaddingBottom(OUTER_PADDING_BOTTOM),
 		container.PaddingLeft(OUTER_PADDING_LEFT),
 		container.PaddingTop(OUTER_PADDING_TOP),
@@ -87,14 +95,5 @@ func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget)
 	e(err)
 
 	// Run the display.
-	termdash.Run(ctx, t, c, termdash.KeyboardSubscriber(
-		func(k *terminalapi.Keyboard) {
-			// When a user presses Esc, close the application.
-			if k.Key == keyboard.KeyEsc {
-				cancel()
-				t.Close()
-				os.Exit(0)
-			}
-		},
-	))
+	termdash.Run(ctx, appTermdash, c, termdash.KeyboardSubscriber(keyboardTermdashHandler))
 }

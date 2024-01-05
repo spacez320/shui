@@ -84,7 +84,7 @@ func display(driver DisplayDriver, f func()) {
 	switch driver {
 	case DISPLAY_TVIEW:
 		// Start the tview-specific display.
-		err := app.Run()
+		err := appTview.Run()
 		e(err)
 	case DISPLAY_TERMDASH:
 		// Start the termdash-specific display.
@@ -179,7 +179,7 @@ func TableDisplay(query string, filters []string) {
 					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
 				}
 
-				app.Draw()
+				appTview.Draw()
 				i += 1
 			}
 
@@ -205,7 +205,7 @@ func TableDisplay(query string, filters []string) {
 					row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
 				}
 
-				app.Draw()
+				appTview.Draw()
 				i += 1
 			}
 		},
