@@ -184,29 +184,34 @@ func TableDisplay(query string, filters []string) {
 			}
 
 			for {
-				/* slog.Debug(fmt.Sprintf("Receiving value %v", <-storage.PutEvents)) */
-				// Retrieve specific next values.
-				values := FilterSlice((GetResult(query)).Values, valueIndexes)
-				// Row to contain the result.
-				row := resultsView.InsertRow(i)
+				select {
+				case <-interruptChan:
+					// We've received a done signal and should interrupt the display.
+					return
+				default:
+					// Retrieve specific next values.
+					values := FilterSlice((GetResult(query)).Values, valueIndexes)
+					// Row to contain the result.
+					row := resultsView.InsertRow(i)
 
-				for j, value := range values {
-					var nextCellContent string
+					for j, value := range values {
+						var nextCellContent string
 
-					// Extrapolate the field types in order to print them out.
-					switch value.(type) {
-					case int64:
-						nextCellContent = strconv.FormatInt(value.(int64), 10)
-					case float64:
-						nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
-					default:
-						nextCellContent = value.(string)
+						// Extrapolate the field types in order to print them out.
+						switch value.(type) {
+						case int64:
+							nextCellContent = strconv.FormatInt(value.(int64), 10)
+						case float64:
+							nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
+						default:
+							nextCellContent = value.(string)
+						}
+						row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
 					}
-					row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
-				}
 
-				appTview.Draw()
-				i += 1
+					appTview.Draw()
+					i += 1
+				}
 			}
 		},
 	)
@@ -251,13 +256,19 @@ func GraphDisplay(query string, filters []string) {
 		DISPLAY_TERMDASH,
 		func() {
 			for {
-				value := (GetResult(query)).Values[valueIndex]
+				select {
+				case <-interruptChan:
+					// We've received a done signal and should interrupt the display.
+					return
+				default:
+					value := (GetResult(query)).Values[valueIndex]
 
-				switch value.(type) {
-				case int64:
-					resultWidget.Add([]int{int(value.(int64))})
-				case float64:
-					resultWidget.Add([]int{int(value.(float64))})
+					switch value.(type) {
+					case int64:
+						resultWidget.Add([]int{int(value.(int64))})
+					case float64:
+						resultWidget.Add([]int{int(value.(float64))})
+					}
 				}
 			}
 		},

@@ -33,13 +33,22 @@ var (
 	cancel      context.CancelFunc // Cancel function for the termdash display.
 )
 
+// Function to call on keyboard events.
 func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 	switch key.Key {
 	case keyboard.KeyEsc:
 		// When a user presses Esc, close the application.
+		interruptChan <- true
+		currentCtx = context.WithValue(currentCtx, "quit", true)
 		cancel()
 		appTermdash.Close()
 		os.Exit(0)
+	case keyboard.KeyTab:
+		// When a user presses Tab, stop the display but continue running.
+		interruptChan <- true
+		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
+		cancel()
+		appTermdash.Close()
 	}
 }
 
