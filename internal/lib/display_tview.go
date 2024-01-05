@@ -6,6 +6,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -16,19 +17,22 @@ var (
 	appTview = tview.NewApplication() // Tview application.
 )
 
-// Function to call on 'done' events.
+// Function to call on keyboard events.
 func keyboardTviewHandler(key tcell.Key) {
 	switch key {
 	case tcell.KeyEscape:
+		slog.Debug("User pressed ESC.")
 		// When a user presses Esc, close the application.
 		interruptChan <- true
+		slog.Debug("Proceeding with escape handler ...")
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		appTview.Stop()
-	case tcell.KeyTab:
-		// When a user presses Tab, stop the display but continue running.
-		interruptChan <- true
-		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
-		appTview.Stop()
+		os.Exit(0)
+		// case tcell.KeyTab:
+		// 	// When a user presses Tab, stop the display but continue running.
+		// 	interruptChan <- true
+		// 	currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
+		// 	appTview.Stop()
 	}
 }
 
@@ -103,6 +107,7 @@ func initDisplayTview(
 	fmt.Fprintln(helpView, helpText)
 
 	// Initialize the logs view.
+	logsView.SetScrollable(false)
 	logsView.SetBorder(true).SetTitle("Logs")
 	slog.SetDefault(slog.New(slog.NewTextHandler(
 		logsView,

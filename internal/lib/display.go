@@ -132,6 +132,7 @@ func StreamDisplay(query string) {
 				select {
 				case <-interruptChan:
 					// We've received a done signal and should interrupt the display.
+					slog.Debug("Received and interrupt.")
 					return
 				default:
 					fmt.Fprintln(resultsView, (GetResult(query)).Value)
@@ -144,18 +145,12 @@ func StreamDisplay(query string) {
 // Creates a table of results for the results pane.
 func TableDisplay(query string, filters []string) {
 	var (
-		helpText         = "(ESC) Quit"                       // Text to display in the help pane.
+		helpText         = "(ESC) Quit | (TAB) Next Query"    // Text to display in the help pane.
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
 	)
 
-	// Determine the value indexes to populate into the graph. If no filter is
-	// provided, the index is assumed to be zero.
-	if len(filters) > 0 {
-		for _, filter := range filters {
-			valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
-		}
-	}
+	helpText += fmt.Sprintf("\nQuery: %v", query)
 
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewTable(helpText)
@@ -167,6 +162,14 @@ func TableDisplay(query string, filters []string) {
 			var (
 				i = 0 // Used to determine the next row index.
 			)
+
+			// Determine the value indexes to populate into the graph. If no filter is
+			// provided, the index is assumed to be zero.
+			if len(filters) > 0 {
+				for _, filter := range filters {
+					valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
+				}
+			}
 
 			// Create the table header.
 			if labels := store.GetLabels(query); len(labels) > 0 {
@@ -187,6 +190,7 @@ func TableDisplay(query string, filters []string) {
 				select {
 				case <-interruptChan:
 					// We've received a done signal and should interrupt the display.
+					slog.Debug("Received an interrupt.")
 					return
 				default:
 					// Retrieve specific next values.
@@ -259,6 +263,7 @@ func GraphDisplay(query string, filters []string) {
 				select {
 				case <-interruptChan:
 					// We've received a done signal and should interrupt the display.
+					slog.Debug("Received an interrupt.")
 					return
 				default:
 					value := (GetResult(query)).Values[valueIndex]
