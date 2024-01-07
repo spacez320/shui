@@ -49,7 +49,6 @@ func initDisplayTviewTable(helpText string) (
 	resultsView.SetBorders(true).SetDoneFunc(keyboardTviewHandler)
 	resultsView.SetBorder(true).SetTitle("Results")
 
-	// slog.Debug("Initializing the rest of the display.")
 	initDisplayTview(resultsView, helpView, logsView, helpText)
 
 	return
