@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -23,15 +24,23 @@ import (
 type queryMode int
 
 // Queries provided as flags.
-type queries_ []string
+type queriesArg []string
 
-func (q *queries_) String() string {
+func (q *queriesArg) String() string {
 	return fmt.Sprintf("%v", &q)
 }
 
-func (q *queries_) Set(query string) error {
+func (q *queriesArg) Set(query string) error {
 	*q = append(*q, query)
 	return nil
+}
+
+// // Converts to a string slice.
+func (q *queriesArg) ToStrings() (q_strings []string) {
+	for _, v := range *q {
+		q_strings = append(q_strings, v)
+	}
+	return
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -47,16 +56,16 @@ const (
 )
 
 var (
-	attempts    int      // Number of attempts to execute the query.
-	delay       int      // Delay between queries.
-	filters     string   // Result filters.
-	logLevel    string   // Log level.
-	mode        int      // Mode to execute in.
-	port        string   // Port for RPC.
-	queries     queries_ // Queries to execute.
-	resultMode  int      // Result mode to display.
-	silent      bool     // Whether or not to be quiet.
-	valueLabels string   // Result value labels.
+	attempts    int        // Number of attempts to execute the query.
+	delay       int        // Delay between queries.
+	filters     string     // Result filters.
+	logLevel    string     // Log level.
+	mode        int        // Mode to execute in.
+	port        string     // Port for RPC.
+	queries     queriesArg // Queries to execute.
+	displayMode int        // Result mode to display.
+	silent      bool       // Whether or not to be quiet.
+	valueLabels string     // Result value labels.
 
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
@@ -92,7 +101,7 @@ func main() {
 	flag.StringVar(&filters, "f", "", "Results filters.")
 	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
 	flag.StringVar(&logLevel, "l", "error", "Log level.")
-	flag.IntVar(&resultMode, "r", int(lib.RESULT_MODE_RAW), "Result mode to display.")
+	flag.IntVar(&displayMode, "r", int(lib.DISPLAY_MODE_RAW), "Result mode to display.")
 	flag.StringVar(&port, "p", "12345", "Port for RPC.")
 	flag.Var(&queries, "q", "Query to execute.")
 	flag.StringVar(&valueLabels, "v", "", "Labels to apply to query values, separated by commas.")
@@ -100,7 +109,7 @@ func main() {
 
 	// Set-up logging.
 
-	if silent || resultMode == int(lib.RESULT_MODE_GRAPH) {
+	if silent || displayMode == int(lib.DISPLAY_MODE_GRAPH) {
 		// Silence all output.
 		logger.SetOutput(ioutil.Discard)
 	} else {
@@ -129,10 +138,16 @@ func main() {
 
 	// Execute result viewing.
 
+	// Initialize context.
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "queries", queries.ToStrings())
+
+	// Start results.
 	if !silent {
 		lib.Results(
-			lib.ResultMode(resultMode),
-			queries[0], // TODO Until result modes support >1 query.
+			ctx,
+			lib.DisplayMode(displayMode),
+			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			parseCommaDelimitedArg(valueLabels),
 			parseCommaDelimitedArg(filters),
 			lib.Config{

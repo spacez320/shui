@@ -22,3 +22,12 @@ func TestFilterSlice(t *testing.T) {
 		t.Errorf("Got: %v Expected %v\n", got, expected)
 	}
 }
+
+func TestRelativePerc(t *testing.T) {
+	got := RelativePerc(80, 10)
+	expected := 50
+
+	if got != expected {
+		t.Errorf("Got: %v Expected %v\n", got, expected)
+	}
+}
