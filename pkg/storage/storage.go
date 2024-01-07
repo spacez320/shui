@@ -166,7 +166,14 @@ func (s *Storage) NewResults(query string) {
 func (s *Storage) Put(query string, value string, values ...interface{}) Result {
 	s.NewResults(query)
 	result := (*s)[query].put(value, values...)
-	PutEvents[query] <- result
+
+	// Send a non-blocking put event. Put events are lossy and clients may lose
+	// information if not actively listening.
+	select {
+	case PutEvents[query] <- result:
+	default:
+	}
+
 	return result
 }
 

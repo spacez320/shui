@@ -65,6 +65,7 @@ var (
 		DISPLAY_MODE_TABLE,
 		DISPLAY_MODE_GRAPH,
 	} // Display modes considered for use in the current session.
+	interruptChan = make(chan bool) // Channel for interrupting displays.
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,7 +79,7 @@ var (
 // the display.
 func display(driver DisplayDriver, f func()) {
 	// Execute the update function.
-	go func() { f() }()
+	go f()
 
 	switch driver {
 	case DISPLAY_TVIEW:
@@ -123,12 +124,23 @@ func StreamDisplay(query string) {
 		func() {
 			// Print labels as the first line, if they are present.
 			if labels := store.GetLabels(query); len(labels) > 0 {
-				fmt.Fprintln(resultsView, labels)
+				appTview.QueueUpdateDraw(func() {
+					fmt.Fprintln(resultsView, labels)
+				})
 			}
 
 			// Print results.
 			for {
-				fmt.Fprintln(resultsView, (GetResult(query)).Value)
+				// Listen for an interrupt event to stop result consumption in
+				// preparation for some display change.
+				select {
+				case <-interruptChan:
+					// We've received an interrupt.
+					return
+				default:
+					// We can display the next result.
+					fmt.Fprintln(resultsView, (GetResult(query)).Value)
+				}
 			}
 		},
 	)
@@ -152,7 +164,8 @@ func TableDisplay(query string, filters []string) {
 		DISPLAY_TVIEW,
 		func() {
 			var (
-				i = 0 // Used to determine the next row index.
+				nextCellContent string // Next cell to add to the table.
+				i               = 0    // Used to determine the next row index.
 			)
 
 			// Determine the value indexes to populate into the graph. If no filter is
@@ -165,42 +178,47 @@ func TableDisplay(query string, filters []string) {
 
 			// Create the table header.
 			if labels := store.GetLabels(query); len(labels) > 0 {
-				// Labels to apply.
-				labels = FilterSlice(labels, valueIndexes)
-				// Row to contain the labels.
-				headerRow := resultsView.InsertRow(i)
+				appTview.QueueUpdateDraw(func() {
+					// Row to contain the labels.
+					headerRow := resultsView.InsertRow(i)
 
-				for j, label := range labels {
-					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
-				}
-
-				appTview.Draw()
+					for j, label := range FilterSlice(labels, valueIndexes) {
+						headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
+					}
+				})
 				i += 1
 			}
 
+			// Print results.
 			for {
-				values := FilterSlice((GetResult(query)).Values, valueIndexes)
-				// Row to contain the result.
-				row := resultsView.InsertRow(i)
+				// Listen for an interrupt event to stop result consumption in
+				// preparation for some display change.
+				select {
+				case <-interruptChan:
+					// We've received an interrupt.
+					return
+				default:
+					// We can display the next result.
+					appTview.QueueUpdateDraw(func() {
+						var (
+							row = resultsView.InsertRow(i) // Row to contain the result.
+						)
 
-				for j, value := range values {
-					var nextCellContent string
-
-					// Extrapolate the field types in order to print them out.
-					switch value.(type) {
-					case int64:
-						nextCellContent = strconv.FormatInt(value.(int64), 10)
-					case float64:
-						nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
-					default:
-						nextCellContent = value.(string)
-					}
-					row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
+						for j, value := range FilterSlice((GetResult(query)).Values, valueIndexes) {
+							// Extrapolate the field types in order to print them out.
+							switch value.(type) {
+							case int64:
+								nextCellContent = strconv.FormatInt(value.(int64), 10)
+							case float64:
+								nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
+							default:
+								nextCellContent = value.(string)
+							}
+							row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
+						}
+					})
+					i += 1
 				}
-
-				appTview.Draw()
-				i += 1
-				// }
 			}
 		},
 	)
@@ -209,9 +227,11 @@ func TableDisplay(query string, filters []string) {
 // Creates a graph of results for the results pane.
 func GraphDisplay(query string, filters []string) {
 	var (
-		helpText   = "(ESC) Quit" // Text to display in the help pane.
-		valueIndex = 0            // Index of the result value to graph.
+		helpText   = "(ESC) Quit | (TAB) Next Query" // Text to display in the help pane.
+		valueIndex = 0                               // Index of the result value to graph.
 	)
+
+	helpText += fmt.Sprintf("\nQuery: %v", query)
 
 	// Determine the values to populate into the graph. If no filter is provided,
 	// the first value is taken.
@@ -245,13 +265,22 @@ func GraphDisplay(query string, filters []string) {
 		DISPLAY_TERMDASH,
 		func() {
 			for {
-				value := (GetResult(query)).Values[valueIndex]
+				// Listen for an interrupt event to stop result consumption in
+				// preparation for some display change.
+				select {
+				case <-interruptChan:
+					// We've received an interrupt.
+					return
+				default:
+					// We can display the next result.
+					value := (GetResult(query)).Values[valueIndex]
 
-				switch value.(type) {
-				case int64:
-					resultWidget.Add([]int{int(value.(int64))})
-				case float64:
-					resultWidget.Add([]int{int(value.(float64))})
+					switch value.(type) {
+					case int64:
+						resultWidget.Add([]int{int(value.(int64))})
+					case float64:
+						resultWidget.Add([]int{int(value.(float64))})
+					}
 				}
 			}
 		},

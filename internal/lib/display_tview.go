@@ -6,7 +6,6 @@ package lib
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -24,11 +23,16 @@ func keyboardTviewHandler(key tcell.Key) {
 		// When a user presses Esc, close the application.
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		appTview.Stop()
-		os.Exit(0)
 	case tcell.KeyTab:
-		// When a user presses Tab, stop the display but continue running.
-		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
-		appTview.Stop()
+		// This is wrapped in a goroutine to avoid deadlocks with tview.
+		//
+		// See: https://github.com/rivo/tview/issues/784
+		go func() {
+			// When a user presses Tab, stop the display but continue running.
+			interruptChan <- true
+			currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
+			appTview.Stop()
+		}()
 	}
 }
 
@@ -45,6 +49,7 @@ func initDisplayTviewTable(helpText string) (
 	resultsView.SetBorders(true).SetDoneFunc(keyboardTviewHandler)
 	resultsView.SetBorder(true).SetTitle("Results")
 
+	// slog.Debug("Initializing the rest of the display.")
 	initDisplayTview(resultsView, helpView, logsView, helpText)
 
 	return
