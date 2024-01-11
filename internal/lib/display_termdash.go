@@ -14,6 +14,7 @@ import (
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgetapi"
 	"github.com/mum4k/termdash/widgets/text"
+	"golang.org/x/exp/slog"
 )
 
 // Used to provide an io.Writer implementation of termdash text widgets.
@@ -46,7 +47,22 @@ func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
 		cancel()
 		appTermdash.Close()
+	case keyboard.KeyEnter:
+		// When a user presses Tab, stop the display but continue running.
+		interruptChan <- true
+		currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
+		cancel()
+		appTermdash.Close()
 	}
+}
+
+// Error management for termdash.
+func errorTermdashHandler(e error) {
+	// If we hit an error from termdash, just log it and try to continue. Cases
+	// of errors seen so far make sense to ignore:
+	//
+	// - Unimplemented key-strokes.
+	slog.Error(e.Error())
 }
 
 // Sets-up the termdash container, which defines the overall layout, and begins
@@ -101,5 +117,11 @@ func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget)
 	e(err)
 
 	// Run the display.
-	termdash.Run(ctx, appTermdash, c, termdash.KeyboardSubscriber(keyboardTermdashHandler))
+	termdash.Run(
+		ctx,
+		appTermdash,
+		c,
+		termdash.ErrorHandler(errorTermdashHandler),
+		termdash.KeyboardSubscriber(keyboardTermdashHandler),
+	)
 }

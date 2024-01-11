@@ -48,6 +48,7 @@ const (
 )
 
 const (
+	HELP_TEXT            = "(ESC) Quit | (ENTER) Next Display | (TAB) Next Query"
 	HELP_SIZE            = 10 // Proportional size of the logs widget.
 	LOGS_SIZE            = 15 // Proportional size of the logs widget.
 	OUTER_PADDING_LEFT   = 10 // Left padding for the full display.
@@ -60,7 +61,7 @@ const (
 
 var (
 	activeDisplayModes = []DisplayMode{
-		DISPLAY_MODE_RAW,
+		// DISPLAY_MODE_RAW,  // It's impossible to escape raw mode, so we exclude it.
 		DISPLAY_MODE_STREAM,
 		DISPLAY_MODE_TABLE,
 		DISPLAY_MODE_GRAPH,
@@ -110,10 +111,8 @@ func RawDisplay(query string) {
 // Update the results pane with new results as they are generated.
 func StreamDisplay(query string) {
 	var (
-		helpText = "(ESC) Quit | (TAB) Next Query" // Text to display in the help pane.
+		helpText = HELP_TEXT + fmt.Sprintf("\nQuery: %v", query) // Text to display in the help pane.
 	)
-
-	helpText += fmt.Sprintf("\nQuery: %v", query)
 
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewText(helpText)
@@ -149,12 +148,10 @@ func StreamDisplay(query string) {
 // Creates a table of results for the results pane.
 func TableDisplay(query string, filters []string) {
 	var (
-		helpText         = "(ESC) Quit | (TAB) Next Query"    // Text to display in the help pane.
-		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
-		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
+		helpText         = HELP_TEXT + fmt.Sprintf("\nQuery: %v", query) // Text to display in the help pane.
+		tableCellPadding = strings.Repeat(" ", TABLE_PADDING)            // Padding to add to table cell content.
+		valueIndexes     = []int{}                                       // Indexes of the result values to add to the table.
 	)
-
-	helpText += fmt.Sprintf("\nQuery: %v", query)
 
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewTable(helpText)
@@ -227,11 +224,9 @@ func TableDisplay(query string, filters []string) {
 // Creates a graph of results for the results pane.
 func GraphDisplay(query string, filters []string) {
 	var (
-		helpText   = "(ESC) Quit | (TAB) Next Query" // Text to display in the help pane.
-		valueIndex = 0                               // Index of the result value to graph.
+		helpText   = HELP_TEXT + fmt.Sprintf("\nQuery: %v", query) // Text to display in the help pane.
+		valueIndex = 0                                             // Index of the result value to graph.
 	)
-
-	helpText += fmt.Sprintf("\nQuery: %v", query)
 
 	// Determine the values to populate into the graph. If no filter is provided,
 	// the first value is taken.

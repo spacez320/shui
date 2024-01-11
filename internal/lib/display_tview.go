@@ -33,6 +33,18 @@ func keyboardTviewHandler(key tcell.Key) {
 			currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
 			appTview.Stop()
 		}()
+	case tcell.KeyEnter:
+		// This is wrapped in a goroutine to avoid deadlocks with tview.
+		//
+		// See: https://github.com/rivo/tview/issues/784
+		go func() {
+			// When a user presses Shit + Tab, stop the display but continue running.
+			interruptChan <- true
+			currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
+			appTview.Stop()
+		}()
+	default:
+		slog.Debug(fmt.Sprintf("Pressed key: %v", key))
 	}
 }
 
