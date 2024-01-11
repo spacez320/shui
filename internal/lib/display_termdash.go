@@ -48,7 +48,7 @@ func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 		cancel()
 		appTermdash.Close()
 	case keyboard.KeyEnter:
-		// When a user presses Tab, stop the display but continue running.
+		// When a user presses Enter, stop the display but continue running.
 		interruptChan <- true
 		currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
 		cancel()

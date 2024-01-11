@@ -38,7 +38,7 @@ func keyboardTviewHandler(key tcell.Key) {
 		//
 		// See: https://github.com/rivo/tview/issues/784
 		go func() {
-			// When a user presses Shit + Tab, stop the display but continue running.
+			// When a user presses Enter, stop the display but continue running.
 			interruptChan <- true
 			currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
 			appTview.Stop()
