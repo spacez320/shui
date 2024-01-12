@@ -25,9 +25,10 @@ import (
 )
 
 var (
-	config     Config          // Global configuration.
-	currentCtx context.Context // Current context.
-	driver     DisplayDriver   // Display driver, dictated by the results.
+	config        Config                          // Global configuration.
+	currentCtx    context.Context                 // Current context.
+	driver        DisplayDriver                   // Display driver, dictated by the results.
+	readerIndexes map[string]*storage.ReaderIndex // Reader indexes for queries.
 
 	ctxDefaults = map[string]interface{}{
 		"advanceDisplayMode": false,
@@ -52,7 +53,8 @@ func AddResult(query, result string) {
 
 // Retrieves a next result.
 func GetResult(query string) storage.Result {
-	return <-storage.PutEvents[query]
+	slog.Debug(fmt.Sprintf("My current reader index is %v.", *readerIndexes[query]))
+	return store.Next(query, readerIndexes[query])
 }
 
 // Creates a result with filtered values.
@@ -126,6 +128,14 @@ func Results(
 ) {
 	// Assign global config.
 	config = inputConfig
+	// Capture queries from context.
+	queries := ctx.Value("queries").([]string)
+
+	// Iniitialize reader indexes.
+	readerIndexes = make(map[string]*storage.ReaderIndex, len(queries))
+	for _, query := range queries {
+		readerIndexes[query] = store.NewReaderIndex()
+	}
 
 	for {
 		// Assign current context and restore default values.
@@ -167,7 +177,7 @@ func Results(
 		}
 		if currentCtx.Value("advanceQuery").(bool) {
 			// Adjust the query.
-			query = GetNextSliceRing(ctx.Value("queries").([]string), query)
+			query = GetNextSliceRing(queries, query)
 		}
 	}
 }
