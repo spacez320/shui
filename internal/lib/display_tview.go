@@ -43,8 +43,6 @@ func keyboardTviewHandler(key tcell.Key) {
 			currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
 			appTview.Stop()
 		}()
-	default:
-		slog.Debug(fmt.Sprintf("Pressed key: %v", key))
 	}
 }
 

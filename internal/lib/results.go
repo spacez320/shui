@@ -53,7 +53,6 @@ func AddResult(query, result string) {
 
 // Retrieves a next result.
 func GetResult(query string) storage.Result {
-	slog.Debug(fmt.Sprintf("My current reader index is %v.", *readerIndexes[query]))
 	return store.Next(query, readerIndexes[query])
 }
 
