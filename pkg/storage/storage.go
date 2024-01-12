@@ -44,6 +44,8 @@ type Results struct {
 	Results []Result
 }
 
+type ReaderIndex int
+
 // Collection of results mapped to their queries.
 type Storage map[string]*Results
 
@@ -122,6 +124,11 @@ func (r *Results) show() {
 	}
 }
 
+// Incremement a reader index, likely after a read.
+func (i *ReaderIndex) inc() {
+	(*i)++
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Public
@@ -138,6 +145,10 @@ func (s *Storage) Get(query string, time time.Time) Result {
 	return (*s)[query].get(time)
 }
 
+func (s *Storage) GetAll(query string) []Result {
+	return (*s)[query].Results
+}
+
 // Get a result's labels.
 func (s *Storage) GetLabels(query string) []string {
 	return (*s)[query].Labels
@@ -148,9 +159,19 @@ func (s *Storage) GetRange(query string, startTime, endTime time.Time) []Result 
 	return (*s)[query].getRange(startTime, endTime)
 }
 
+func (s *Storage) GetToIndex(query string, index *ReaderIndex) []Result {
+	return (*s)[query].Results[:*index]
+}
+
 // Given a filter, return the corresponding value index.
 func (s *Storage) GetValueIndex(query, filter string) int {
 	return (*s)[query].getValueIndex(filter)
+}
+
+// Initialize a new reader index.
+func (s *Storage) NewReaderIndex() *ReaderIndex {
+	r := ReaderIndex(0)
+	return &r
 }
 
 // Initializes a new results series in a storage.
@@ -160,6 +181,12 @@ func (s *Storage) NewResults(query string) {
 		(*s)[query] = &Results{}
 		PutEvents[query] = make(chan Result, PUT_EVENT_CHANNEL_SIZE)
 	}
+}
+
+func (s *Storage) Next(query string, index *ReaderIndex) (next Result) {
+	next = <-PutEvents[query]
+	index.inc()
+	return
 }
 
 // Put a new compound result.
