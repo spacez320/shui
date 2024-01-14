@@ -5,6 +5,7 @@ package lib
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mum4k/termdash"
 	"github.com/mum4k/termdash/container"
@@ -42,17 +43,19 @@ func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 		cancel()
 		appTermdash.Close()
 	case keyboard.KeyTab:
-		// When a user presses Tab, stop the display but continue running.
-		interruptChan <- true
-		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
-		cancel()
-		appTermdash.Close()
-	case keyboard.KeyEnter:
 		// When a user presses Enter, stop the display but continue running.
 		interruptChan <- true
 		currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
 		cancel()
 		appTermdash.Close()
+	case 'n':
+		// When a user presses Tab, stop the display but continue running.
+		interruptChan <- true
+		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
+		cancel()
+		appTermdash.Close()
+	default:
+		slog.Debug(fmt.Sprintf("Pressed key %v", key.Key))
 	}
 }
 

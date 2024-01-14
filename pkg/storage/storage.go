@@ -56,7 +56,9 @@ type Storage map[string]*Results
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const (
-	PUT_EVENT_CHANNEL_SIZE = 128 // Size of Put channels.
+	// Size of Put channels. This is the amount of results that may accumulate if
+	// not being actively consumed.
+	PUT_EVENT_CHANNEL_SIZE = 128
 )
 
 // Channels for broadcasting Put calls.
