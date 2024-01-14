@@ -17,23 +17,27 @@ var (
 )
 
 // Function to call on keyboard events.
-func keyboardTviewHandler(key tcell.Key) {
-	switch key {
+func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
+	// slog.Debug(fmt.Sprintf("Event is: %v", event))
+	switch key := event.Key(); key {
 	case tcell.KeyEscape:
 		// When a user presses Esc, close the application.
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		appTview.Stop()
+	case tcell.KeyRune:
+		switch event.Rune() {
+		case 'n':
+			// This is wrapped in a goroutine to avoid deadlocks with tview.
+			//
+			// See: https://github.com/rivo/tview/issues/784
+			go func() {
+				// When a user presses Tab, stop the display but continue running.
+				interruptChan <- true
+				currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
+				appTview.Stop()
+			}()
+		}
 	case tcell.KeyTab:
-		// This is wrapped in a goroutine to avoid deadlocks with tview.
-		//
-		// See: https://github.com/rivo/tview/issues/784
-		go func() {
-			// When a user presses Tab, stop the display but continue running.
-			interruptChan <- true
-			currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
-			appTview.Stop()
-		}()
-	case tcell.KeyEnter:
 		// This is wrapped in a goroutine to avoid deadlocks with tview.
 		//
 		// See: https://github.com/rivo/tview/issues/784
@@ -44,6 +48,8 @@ func keyboardTviewHandler(key tcell.Key) {
 			appTview.Stop()
 		}()
 	}
+
+	return event
 }
 
 // Display init function specific to table results.
@@ -56,7 +62,7 @@ func initDisplayTviewTable(helpText string) (
 	logsView = tview.NewTextView()
 
 	// Initialize the results view.
-	resultsView.SetBorders(true).SetDoneFunc(keyboardTviewHandler)
+	resultsView.SetBorders(true)
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	initDisplayTview(resultsView, helpView, logsView, helpText)
@@ -74,7 +80,7 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 	resultsView.SetChangedFunc(
 		func() {
 			appTview.Draw()
-		}).SetDoneFunc(keyboardTviewHandler)
+		})
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	initDisplayTview(resultsView, helpView, logsView, helpText)
@@ -110,6 +116,7 @@ func initDisplayTview(
 		OUTER_PADDING_LEFT,
 		OUTER_PADDING_RIGHT,
 	)
+	flexBox.SetInputCapture(keyboardTviewHandler)
 	appTview.SetRoot(flexBox, true).SetFocus(resultsView)
 
 	// Initialize the help view.
