@@ -200,4 +200,8 @@ func Results(
 			query = GetNextSliceRing(queries, query)
 		}
 	}
+
+	// There is currently no reason why we may arrive here, but in case we do
+	// someday, perform some clean-up.
+	close(pauseDisplayChan)
 }

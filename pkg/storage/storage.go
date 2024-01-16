@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
-	"golang.org/x/exp/slog"
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -204,10 +203,8 @@ func (s *Storage) Next(query string, index *ReaderIndex) (next Result) {
 func (s *Storage) NextOrEmpty(query string, index *ReaderIndex) (next Result) {
 	select {
 	case next = <-PutEvents[query]:
-		slog.Debug("Returning an event I found.")
 		index.inc()
 	default:
-		slog.Debug("Returning an empty result.")
 	}
 	return
 }
