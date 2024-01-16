@@ -36,7 +36,7 @@ const (
 )
 
 const (
-	HELP_TEXT            = "(ESC) Quit | (Tab) Next Display | (n) Next Query"
+	HELP_TEXT            = "(ESC) Quit | (Space) Pause | (Tab) Next Display | (n) Next Query"
 	HELP_SIZE            = 10 // Proportional size of the logs widget.
 	LOGS_SIZE            = 15 // Proportional size of the logs widget.
 	OUTER_PADDING_LEFT   = 10 // Left padding for the full display.
