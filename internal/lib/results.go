@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"text/scanner"
+	"time"
 	"unicode"
 
 	"pkg/storage"
@@ -25,24 +26,27 @@ import (
 )
 
 var (
-	config        Config                          // Global configuration.
-	currentCtx    context.Context                 // Current context.
-	driver        DisplayDriver                   // Display driver, dictated by the results.
-	readerIndexes map[string]*storage.ReaderIndex // Reader indexes for queries.
+	config          Config                          // Global configuration.
+	currentCtx      context.Context                 // Current context.
+	driver          DisplayDriver                   // Display driver, dictated by the results.
+	pauseQueryChans map[string]chan bool            // Channels for dealing with 'pause' events for results.
+	readerIndexes   map[string]*storage.ReaderIndex // Reader indexes for queries.
 
 	ctxDefaults = map[string]interface{}{
 		"advanceDisplayMode": false,
 		"advanceQuery":       false,
 		"quit":               false,
 	} // Defaults applied to context.
-	store = storage.NewStorage() // Stored results.
+	pauseDisplayChan = make(chan bool)      // Channel for dealing with 'pause' events for the display.
+	store            = storage.NewStorage() // Stored results.
 )
 
 // Resets the current context to its default values.
-func resetContext() {
+func resetContext(query string) {
 	for k, v := range ctxDefaults {
 		currentCtx = context.WithValue(currentCtx, k, v)
 	}
+	currentCtx = context.WithValue(currentCtx, "query", query)
 }
 
 // Adds a result to the result store.
@@ -56,13 +60,28 @@ func GetResult(query string) storage.Result {
 	return store.Next(query, readerIndexes[query])
 }
 
+// Retrieves a next result, waiting for a non-empty return.
+func GetResultWait(query string) (result storage.Result) {
+	for {
+		if result = store.NextOrEmpty(query, readerIndexes[query]); result.IsEmpty() {
+			// Wait a tiny bit if we receive an empty result to avoid an excessive
+			// amount of busy waiting. This wait time should be less than the query
+			// delay, otherwise displays will show a release of buffered results.
+			time.Sleep(time.Duration(10) * time.Millisecond)
+		} else {
+			// We found a result.
+			break
+		}
+	}
+
+	return
+}
+
 // Creates a result with filtered values.
 func FilterResult(result storage.Result, labels, filters []string) storage.Result {
 	var (
-		// Indexes of labels from filters, corresponding to result values.
-		labelIndexes = make([]int, len(filters))
-		// Found result values.
-		resultValues = make([]interface{}, len(filters))
+		labelIndexes = make([]int, len(filters))         // Indexes of labels from filters, corresponding to result values.
+		resultValues = make([]interface{}, len(filters)) // Found result values.
 	)
 
 	// Find indexes to pursue for results.
@@ -124,9 +143,12 @@ func Results(
 	query string,
 	labels, filters []string,
 	inputConfig Config,
+	inputPauseQueryChans map[string]chan bool,
 ) {
-	// Assign global config.
+	// Assign global config and global control channels.
 	config = inputConfig
+	pauseQueryChans = inputPauseQueryChans
+
 	// Capture queries from context.
 	queries := ctx.Value("queries").([]string)
 
@@ -139,7 +161,7 @@ func Results(
 	for {
 		// Assign current context and restore default values.
 		currentCtx = ctx
-		resetContext()
+		resetContext(query)
 
 		// Set up labelling or any schema for the results store.
 		store.PutLabels(query, labels)
@@ -165,7 +187,6 @@ func Results(
 		// If we get here, it's because the display functions have returned, probably
 		// because of an interrupt. Assuming we haven't reached some other terminal
 		// situation, restart the results display, adjusting for context.
-
 		if currentCtx.Value("quit").(bool) {
 			// Guess I'll die.
 			os.Exit(0)
@@ -179,4 +200,8 @@ func Results(
 			query = GetNextSliceRing(queries, query)
 		}
 	}
+
+	// There is currently no reason why we may arrive here, but in case we do
+	// someday, perform some clean-up.
+	close(pauseDisplayChan)
 }

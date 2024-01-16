@@ -36,7 +36,7 @@ const (
 )
 
 const (
-	HELP_TEXT            = "(ESC) Quit | (ENTER) Next Display | (TAB) Next Query"
+	HELP_TEXT            = "(ESC) Quit | (Space) Pause | (Tab) Next Display | (n) Next Query"
 	HELP_SIZE            = 10 // Proportional size of the logs widget.
 	LOGS_SIZE            = 15 // Proportional size of the logs widget.
 	OUTER_PADDING_LEFT   = 10 // Left padding for the full display.
@@ -75,6 +75,11 @@ func display(driver DisplayDriver, f func()) {
 	}
 }
 
+// Creates help text for any display.
+func helpText(query string) string {
+	return HELP_TEXT + fmt.Sprintf("\nQuery: %v", query) // Text to display in the help pane.
+}
+
 // Presents raw output.
 func RawDisplay(query string) {
 	go func() {
@@ -86,12 +91,8 @@ func RawDisplay(query string) {
 
 // Update the results pane with new results as they are generated.
 func StreamDisplay(query string) {
-	var (
-		helpText = HELP_TEXT + fmt.Sprintf("\nQuery: %v", query) // Text to display in the help pane.
-	)
-
 	// Initialize the display.
-	resultsView, _, _ := initDisplayTviewText(helpText)
+	resultsView, _, _ := initDisplayTviewText(helpText(query))
 
 	// Start the display.
 	display(
@@ -117,6 +118,9 @@ func StreamDisplay(query string) {
 				case <-interruptChan:
 					// We've received an interrupt.
 					return
+				case <-pauseDisplayChan:
+					// We've received a pause and need to wait for an unpause.
+					<-pauseDisplayChan
 				default:
 					// We can display the next result.
 					fmt.Fprintln(resultsView, (GetResult(query)).Value)
@@ -129,13 +133,12 @@ func StreamDisplay(query string) {
 // Creates a table of results for the results pane.
 func TableDisplay(query string, filters []string) {
 	var (
-		helpText         = HELP_TEXT + fmt.Sprintf("\nQuery: %v", query) // Text to display in the help pane.
-		tableCellPadding = strings.Repeat(" ", TABLE_PADDING)            // Padding to add to table cell content.
-		valueIndexes     = []int{}                                       // Indexes of the result values to add to the table.
+		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
+		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
 	)
 
 	// Initialize the display.
-	resultsView, _, _ := initDisplayTviewTable(helpText)
+	resultsView, _, _ := initDisplayTviewTable(helpText(query))
 
 	// Start the display.
 	display(
@@ -198,6 +201,9 @@ func TableDisplay(query string, filters []string) {
 				case <-interruptChan:
 					// We've received an interrupt.
 					return
+				case <-pauseDisplayChan:
+					// We've received a pause and need to wait for an unpause.
+					<-pauseDisplayChan
 				default:
 					// We can display the next result.
 					appTview.QueueUpdateDraw(func() {
@@ -228,8 +234,7 @@ func TableDisplay(query string, filters []string) {
 // Creates a graph of results for the results pane.
 func GraphDisplay(query string, filters []string) {
 	var (
-		helpText   = HELP_TEXT + fmt.Sprintf("\nQuery: %v", query) // Text to display in the help pane.
-		valueIndex = 0                                             // Index of the result value to graph.
+		valueIndex = 0 // Index of the result value to graph.
 	)
 
 	// Determine the values to populate into the graph. If no filter is provided,
@@ -248,7 +253,7 @@ func GraphDisplay(query string, filters []string) {
 	// Initialize the help view.
 	helpWidget, err := text.New()
 	e(err)
-	helpWidget.Write(helpText)
+	helpWidget.Write(helpText(query))
 
 	// Initialize the logs view.
 	logsWidget, err := text.New()
@@ -283,6 +288,9 @@ func GraphDisplay(query string, filters []string) {
 				case <-interruptChan:
 					// We've received an interrupt.
 					return
+				case <-pauseDisplayChan:
+					// We've received a pause and need to wait for an unpause.
+					<-pauseDisplayChan
 				default:
 					// We can display the next result.
 					value := (GetResult(query)).Values[valueIndex]

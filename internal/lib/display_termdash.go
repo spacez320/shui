@@ -37,22 +37,26 @@ var (
 func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 	switch key.Key {
 	case keyboard.KeyEsc:
-		// When a user presses Esc, close the application.
+		// Escape quits the program.
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		cancel()
 		appTermdash.Close()
 	case keyboard.KeyTab:
-		// When a user presses Tab, stop the display but continue running.
-		interruptChan <- true
-		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
-		cancel()
-		appTermdash.Close()
-	case keyboard.KeyEnter:
-		// When a user presses Enter, stop the display but continue running.
+		// Tab switches display modes.
 		interruptChan <- true
 		currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
 		cancel()
 		appTermdash.Close()
+	case 'n':
+		// 'n' switches queries.
+		interruptChan <- true
+		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
+		cancel()
+		appTermdash.Close()
+	case ' ':
+		// Space pauses.
+		pauseDisplayChan <- true
+		pauseQueryChans[currentCtx.Value("query").(string)] <- true
 	}
 }
 

@@ -17,33 +17,42 @@ var (
 )
 
 // Function to call on keyboard events.
-func keyboardTviewHandler(key tcell.Key) {
-	switch key {
+func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
+	// Key events are wrapped in goroutines to avoid deadlocks with tview.
+	//
+	// See: https://github.com/rivo/tview/issues/784
+	switch key := event.Key(); key {
 	case tcell.KeyEscape:
-		// When a user presses Esc, close the application.
+		// Escape quits the program.
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		appTview.Stop()
+	case tcell.KeyRune:
+		switch event.Rune() {
+		case 'n':
+			// 'n' switches queries.
+			go func() {
+				// When a user presses Tab, stop the display but continue running.
+				interruptChan <- true
+				currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
+				appTview.Stop()
+			}()
+		case ' ':
+			// Space pauses.
+			go func() {
+				pauseDisplayChan <- true
+				pauseQueryChans[currentCtx.Value("query").(string)] <- true
+			}()
+		}
 	case tcell.KeyTab:
-		// This is wrapped in a goroutine to avoid deadlocks with tview.
-		//
-		// See: https://github.com/rivo/tview/issues/784
+		// Tab switches display modes.
 		go func() {
-			// When a user presses Tab, stop the display but continue running.
-			interruptChan <- true
-			currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
-			appTview.Stop()
-		}()
-	case tcell.KeyEnter:
-		// This is wrapped in a goroutine to avoid deadlocks with tview.
-		//
-		// See: https://github.com/rivo/tview/issues/784
-		go func() {
-			// When a user presses Enter, stop the display but continue running.
 			interruptChan <- true
 			currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
 			appTview.Stop()
 		}()
 	}
+
+	return event
 }
 
 // Display init function specific to table results.
@@ -56,7 +65,7 @@ func initDisplayTviewTable(helpText string) (
 	logsView = tview.NewTextView()
 
 	// Initialize the results view.
-	resultsView.SetBorders(true).SetDoneFunc(keyboardTviewHandler)
+	resultsView.SetBorders(true)
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	initDisplayTview(resultsView, helpView, logsView, helpText)
@@ -71,10 +80,7 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 	logsView = tview.NewTextView()
 
 	// Initialize the results view.
-	resultsView.SetChangedFunc(
-		func() {
-			appTview.Draw()
-		}).SetDoneFunc(keyboardTviewHandler)
+	resultsView.SetChangedFunc(func() { appTview.Draw() })
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	initDisplayTview(resultsView, helpView, logsView, helpText)
@@ -110,6 +116,7 @@ func initDisplayTview(
 		OUTER_PADDING_LEFT,
 		OUTER_PADDING_RIGHT,
 	)
+	flexBox.SetInputCapture(keyboardTviewHandler)
 	appTview.SetRoot(flexBox, true).SetFocus(resultsView)
 
 	// Initialize the help view.
@@ -117,7 +124,7 @@ func initDisplayTview(
 	fmt.Fprintln(helpView, helpText)
 
 	// Initialize the logs view.
-	logsView.SetScrollable(false)
+	logsView.SetScrollable(false).SetChangedFunc(func() { appTview.Draw() })
 	logsView.SetBorder(true).SetTitle("Logs")
 	slog.SetDefault(slog.New(slog.NewTextHandler(
 		logsView,
