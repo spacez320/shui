@@ -36,6 +36,14 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 				currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
 				appTview.Stop()
 			}()
+		case ' ':
+			// This is wrapped in a goroutine to avoid deadlocks with tview.
+			//
+			// See: https://github.com/rivo/tview/issues/784
+			go func() {
+				pauseDisplayChan <- true
+				pauseQueryChans[currentCtx.Value("query").(string)] <- true
+			}()
 		}
 	case tcell.KeyTab:
 		// This is wrapped in a goroutine to avoid deadlocks with tview.
@@ -77,10 +85,7 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 	logsView = tview.NewTextView()
 
 	// Initialize the results view.
-	resultsView.SetChangedFunc(
-		func() {
-			appTview.Draw()
-		})
+	resultsView.SetChangedFunc(func() { appTview.Draw() })
 	resultsView.SetBorder(true).SetTitle("Results")
 
 	initDisplayTview(resultsView, helpView, logsView, helpText)
@@ -124,7 +129,7 @@ func initDisplayTview(
 	fmt.Fprintln(helpView, helpText)
 
 	// Initialize the logs view.
-	logsView.SetScrollable(false)
+	logsView.SetScrollable(false).SetChangedFunc(func() { appTview.Draw() })
 	logsView.SetBorder(true).SetTitle("Logs")
 	slog.SetDefault(slog.New(slog.NewTextHandler(
 		logsView,

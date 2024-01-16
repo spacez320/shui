@@ -15,9 +15,11 @@ package storage
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"golang.org/x/exp/slices"
+	"golang.org/x/exp/slog"
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,6 +144,11 @@ func NewStorage() Storage {
 	return Storage{}
 }
 
+// Determines whether this is an empty result.
+func (r *Result) IsEmpty() bool {
+	return reflect.DeepEqual(*r, Result{})
+}
+
 // Get a result based on a timestamp.
 func (s *Storage) Get(query string, time time.Time) Result {
 	return (*s)[query].get(time)
@@ -185,9 +192,23 @@ func (s *Storage) NewResults(query string) {
 	}
 }
 
+// Retrieve the next result from a put event channel.
 func (s *Storage) Next(query string, index *ReaderIndex) (next Result) {
 	next = <-PutEvents[query]
 	index.inc()
+	return
+}
+
+// Retrieve the next result from a put event channel, returning an empty result
+// if nothing exists.
+func (s *Storage) NextOrEmpty(query string, index *ReaderIndex) (next Result) {
+	select {
+	case next = <-PutEvents[query]:
+		slog.Debug("Returning an event I found.")
+		index.inc()
+	default:
+		slog.Debug("Returning an empty result.")
+	}
 	return
 }
 

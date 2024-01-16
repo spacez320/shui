@@ -54,6 +54,9 @@ func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
 		cancel()
 		appTermdash.Close()
+	case ' ':
+		pauseDisplayChan <- true
+		pauseQueryChans[currentCtx.Value("query").(string)] <- true
 	default:
 		slog.Debug(fmt.Sprintf("Pressed key %v", key.Key))
 	}

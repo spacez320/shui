@@ -118,6 +118,9 @@ func StreamDisplay(query string) {
 				case <-interruptChan:
 					// We've received an interrupt.
 					return
+				case <-pauseDisplayChan:
+					// We've received a pause and need to wait for an unpause.
+					<-pauseDisplayChan
 				default:
 					// We can display the next result.
 					fmt.Fprintln(resultsView, (GetResult(query)).Value)
@@ -198,6 +201,9 @@ func TableDisplay(query string, filters []string) {
 				case <-interruptChan:
 					// We've received an interrupt.
 					return
+				case <-pauseDisplayChan:
+					// We've received a pause and need to wait for an unpause.
+					<-pauseDisplayChan
 				default:
 					// We can display the next result.
 					appTview.QueueUpdateDraw(func() {
@@ -282,6 +288,9 @@ func GraphDisplay(query string, filters []string) {
 				case <-interruptChan:
 					// We've received an interrupt.
 					return
+				case <-pauseDisplayChan:
+					// We've received a pause and need to wait for an unpause.
+					<-pauseDisplayChan
 				default:
 					// We can display the next result.
 					value := (GetResult(query)).Values[valueIndex]

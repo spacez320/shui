@@ -29,7 +29,7 @@ func (q *queriesArg) Set(query string) error {
 	return nil
 }
 
-// // Converts to a string slice.
+// Converts to a string slice.
 func (q *queriesArg) ToStrings() (q_strings []string) {
 	for _, v := range *q {
 		q_strings = append(q_strings, v)
@@ -46,21 +46,21 @@ const (
 var (
 	attempts    int        // Number of attempts to execute the query.
 	delay       int        // Delay between queries.
+	displayMode int        // Result mode to display.
 	filters     string     // Result filters.
 	logLevel    string     // Log level.
 	mode        int        // Mode to execute in.
 	port        string     // Port for RPC.
 	queries     queriesArg // Queries to execute.
-	displayMode int        // Result mode to display.
 	silent      bool       // Whether or not to be quiet.
 	valueLabels string     // Result value labels.
 
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
 		"debug": slog.LevelDebug,
+		"error": slog.LevelError,
 		"info":  slog.LevelInfo,
 		"warn":  slog.LevelWarn,
-		"error": slog.LevelError,
 	} // Log levels acceptable as a flag.
 )
 
@@ -75,8 +75,12 @@ func parseCommaDelimitedArg(arg string) []string {
 }
 
 func main() {
-	// Define arguments.
+	var (
+		doneQueriesChan chan bool            // Channels for tracking query completion.
+		pauseQueryChans map[string]chan bool // Channels for pausing queries.
+	)
 
+	// Define arguments.
 	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
 	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
@@ -90,7 +94,6 @@ func main() {
 	flag.Parse()
 
 	// Set-up logging.
-
 	if silent || displayMode == int(lib.DISPLAY_MODE_GRAPH) {
 		// Silence all output.
 		logger.SetOutput(ioutil.Discard)
@@ -103,28 +106,30 @@ func main() {
 	}
 
 	// Execute the specified mode.
-
-	var done chan int
-
 	switch {
 	case mode == int(MODE_QUERY):
 		slog.Debug("Executing in query mode.")
-		done = lib.Query(queries, attempts, delay, port)
+
+		doneQueriesChan, pauseQueryChans = lib.Query(queries, attempts, delay, port)
+		defer close(doneQueriesChan)
+		for _, pauseChan := range pauseQueryChans {
+			defer close(pauseChan)
+		}
 	case mode == int(MODE_READ):
 		slog.Debug("Executing in read mode.")
-		done = lib.Read(port)
+
+	// FIXME Temporarily disabling read mode.
+	// 	done = lib.Read(port)
 	default:
 		slog.Error(fmt.Sprintf("Invalid mode: %d\n", mode))
 		os.Exit(1)
 	}
 
-	// Execute result viewing.
-
 	// Initialize context.
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, "queries", queries.ToStrings())
 
-	// Start results.
+	// Execute result viewing.
 	if !silent {
 		lib.Results(
 			ctx,
@@ -135,8 +140,9 @@ func main() {
 			lib.Config{
 				LogLevel: logLevel,
 			},
+			pauseQueryChans,
 		)
 	}
 
-	<-done
+	<-doneQueriesChan
 }
