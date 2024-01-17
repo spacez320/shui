@@ -39,8 +39,9 @@ func (q *queriesArg) ToStrings() (q_strings []string) {
 
 // Mode constants.
 const (
-	MODE_QUERY queryMode = iota + 1 // For running in 'query' mode.
-	MODE_READ                       // For running in 'read' mode.
+	MODE_QUERY   queryMode = iota + 1 // For running in 'query' mode.
+	MODE_PROFILE                      // For running in 'profile' mode.
+	MODE_READ                         // For running in 'read' mode.
 )
 
 var (
@@ -80,17 +81,22 @@ func main() {
 		pauseQueryChans map[string]chan bool // Channels for pausing queries.
 	)
 
+	defer close(doneQueriesChan)
+	for _, pauseChan := range pauseQueryChans {
+		defer close(pauseChan)
+	}
+
 	// Define arguments.
 	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
 	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
-	flag.StringVar(&filters, "f", "", "Results filters.")
-	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
-	flag.StringVar(&logLevel, "l", "error", "Log level.")
 	flag.IntVar(&displayMode, "r", int(lib.DISPLAY_MODE_RAW), "Result mode to display.")
+	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
+	flag.StringVar(&filters, "f", "", "Results filters.")
+	flag.StringVar(&logLevel, "l", "error", "Log level.")
 	flag.StringVar(&port, "p", "12345", "Port for RPC.")
-	flag.Var(&queries, "q", "Query to execute.")
 	flag.StringVar(&valueLabels, "v", "", "Labels to apply to query values, separated by commas.")
+	flag.Var(&queries, "q", "Query to execute. When in query mode, this is expected to be some command. When in profile mode it is expected to be PID.")
 	flag.Parse()
 
 	// Set-up logging.
@@ -107,14 +113,26 @@ func main() {
 
 	// Execute the specified mode.
 	switch {
+	case mode == int(MODE_PROFILE):
+		slog.Debug("Executing in profile mode.")
+
+		doneQueriesChan, pauseQueryChans = lib.Query(
+			lib.QUERY_MODE_PROFILE,
+			queries,
+			attempts,
+			delay,
+			port,
+		)
 	case mode == int(MODE_QUERY):
 		slog.Debug("Executing in query mode.")
 
-		doneQueriesChan, pauseQueryChans = lib.Query(queries, attempts, delay, port)
-		defer close(doneQueriesChan)
-		for _, pauseChan := range pauseQueryChans {
-			defer close(pauseChan)
-		}
+		doneQueriesChan, pauseQueryChans = lib.Query(
+			lib.QUERY_MODE_COMMAND,
+			queries,
+			attempts,
+			delay,
+			port,
+		)
 	case mode == int(MODE_READ):
 		slog.Debug("Executing in read mode.")
 

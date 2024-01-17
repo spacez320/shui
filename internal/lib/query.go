@@ -12,8 +12,18 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-// Executes a query.
-func runQuery(query string, attempts, delay int, doneChan, pauseChan chan bool) {
+const (
+	QUERY_MODE_COMMAND int = iota + 1 // Queries are commands.
+	QUERY_MODE_PROFILE                // Queries are PIDs to profile.
+)
+
+// Wrapper for query execution.
+func runQuery(
+	query string,
+	attempts, delay int,
+	doneChan, pauseChan chan bool,
+	queryFunc func(string),
+) {
 	// This loop executes as long as attempts has not been reached, or
 	// indefinitely if attempts is less than zero.
 	for i := 0; attempts < 0 || i < attempts; i++ {
@@ -21,39 +31,9 @@ func runQuery(query string, attempts, delay int, doneChan, pauseChan chan bool) 
 		case <-pauseChan:
 			// Manage pausing. If we receive from the pause channel, wait for another
 			// message from the pause channel.
-			slog.Debug(fmt.Sprintf("Pausing query: '%s'.\n.", query))
 			<-pauseChan
-			slog.Debug(fmt.Sprintf("Unpausing query: '%s'.\n.", query))
 		default:
-			// Prepare query execution.
-			slog.Debug(fmt.Sprintf("Executing query: '%s' ...\n", query))
-			cmd := exec.Command("bash", "-c", query)
-
-			// Set-up pipes for command output.
-			stdout, stdout_err := cmd.StdoutPipe()
-			stderr, stderr_err := cmd.StderrPipe()
-			e(stdout_err)
-			e(stderr_err)
-
-			// Execute the query.
-			cmd_err := cmd.Start()
-			e(cmd_err)
-
-			// Manage potential errors coming from the command itself.
-			cmd_stderr_output, cmd_stderr_output_err := io.ReadAll(stderr)
-			e(cmd_stderr_output_err)
-			if len(cmd_stderr_output) != 0 {
-				slog.Error(fmt.Sprintf("Query '%s' error is: \n%s\n", query, cmd_stderr_output))
-			}
-
-			// Interpret results.
-			cmd_output, cmd_output_err := io.ReadAll(stdout)
-			e(cmd_output_err)
-			AddResult(query, string(cmd_output))
-			slog.Debug(fmt.Sprintf("Query '%s' result is: \n%s\n", query, cmd_output))
-
-			// Clean-up.
-			cmd.Wait()
+			queryFunc(query)
 
 			// This is not the last execution--add a delay.
 			if i != attempts {
@@ -62,11 +42,53 @@ func runQuery(query string, attempts, delay int, doneChan, pauseChan chan bool) 
 		}
 	}
 
-	doneChan <- true // Signals that this query is finished.
+	doneChan <- true
+}
+
+// Executes a query as a process to profile.
+func runQueryProfile(pid string) {
+	slog.Debug(fmt.Sprintf("Executing profile for PID: '%s' ...\n", pid))
+
+	AddResult(pid, runProfile(pid))
+}
+
+// Executes a query as a command to exec.
+func runQueryExec(query string) {
+	slog.Debug(fmt.Sprintf("Executing query: '%s' ...\n", query))
+
+	// Prepare query execution.
+	cmd := exec.Command("bash", "-c", query)
+
+	// Set-up pipes for command output.
+	stdout, stdout_err := cmd.StdoutPipe()
+	stderr, stderr_err := cmd.StderrPipe()
+	e(stdout_err)
+	e(stderr_err)
+
+	// Execute the query.
+	cmd_err := cmd.Start()
+	e(cmd_err)
+
+	// Manage potential errors coming from the command itself.
+	cmd_stderr_output, cmd_stderr_output_err := io.ReadAll(stderr)
+	e(cmd_stderr_output_err)
+	if len(cmd_stderr_output) != 0 {
+		slog.Error(fmt.Sprintf("Query '%s' error is: \n%s\n", query, cmd_stderr_output))
+	}
+
+	// Interpret results.
+	cmd_output, cmd_output_err := io.ReadAll(stdout)
+	e(cmd_output_err)
+	AddResult(query, string(cmd_output))
+	slog.Debug(fmt.Sprintf("Query '%s' result is: \n%s\n", query, cmd_output))
+
+	// Clean-up.
+	cmd.Wait()
 }
 
 // Entrypoint for 'query' mode.
 func Query(
+	queryMode int,
 	queries []string,
 	attempts int,
 	delay int,
@@ -86,16 +108,24 @@ func Query(
 		pauseQueryChans[query] = make(chan bool)
 
 		// Execute the queries.
-		go runQuery(query, attempts, delay, doneQueryChan, pauseQueryChans[query])
+		switch queryMode {
+		case QUERY_MODE_COMMAND:
+			slog.Debug("Executing in query mode command.")
+			go runQuery(query, attempts, delay, doneQueryChan, pauseQueryChans[query], runQueryExec)
+		case QUERY_MODE_PROFILE:
+			slog.Debug("Executing in query mode profile.")
+			go runQuery(query, attempts, delay, doneQueryChan, pauseQueryChans[query], runQueryProfile)
+		}
 	}
 
 	// Begin the goroutine to wait for query completion.
 	go func() {
+		defer close(doneQueryChan)
+
 		// Wait for the queries to finish.
 		for i := 0; i < len(queries); i++ {
 			<-doneQueryChan
 		}
-		close(doneQueryChan)
 
 		// Signal overall completion.
 		doneQueriesChan <- true

@@ -60,9 +60,9 @@ var (
 // Starts the display. Applies contextual logic depending on the provided
 // display driver. Expects a function to execute within a goroutine to update
 // the display.
-func display(driver DisplayDriver, f func()) {
+func display(driver DisplayDriver, displayUpdateFunc func()) {
 	// Execute the update function.
-	go f()
+	go displayUpdateFunc()
 
 	switch driver {
 	case DISPLAY_TVIEW:
@@ -73,6 +73,11 @@ func display(driver DisplayDriver, f func()) {
 		// Start the termdash-specific display.
 		// Nothing to do, yet.
 	}
+}
+
+// Clean-up display logic when fully quitting.
+func displayQuit() {
+	close(interruptChan)
 }
 
 // Creates help text for any display.

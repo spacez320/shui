@@ -49,7 +49,7 @@ func resetContext(query string) {
 	currentCtx = context.WithValue(currentCtx, "query", query)
 }
 
-// Adds a result to the result store.
+// Adds a result to the result store based on a string.
 func AddResult(query, result string) {
 	result = strings.TrimSpace(result)
 	store.Put(query, result, TokenizeResult(result)...)
@@ -149,6 +149,13 @@ func Results(
 	config = inputConfig
 	pauseQueryChans = inputPauseQueryChans
 
+	// There is currently no reason why we may arrive at deffers, but in case we
+	// do someday, perform some clean-up.
+	defer close(pauseDisplayChan)
+	for _, pauseQueryChan := range pauseQueryChans {
+		defer close(pauseQueryChan)
+	}
+
 	// Capture queries from context.
 	queries := ctx.Value("queries").([]string)
 
@@ -189,6 +196,7 @@ func Results(
 		// situation, restart the results display, adjusting for context.
 		if currentCtx.Value("quit").(bool) {
 			// Guess I'll die.
+			displayQuit()
 			os.Exit(0)
 		}
 		if currentCtx.Value("advanceDisplayMode").(bool) {
@@ -200,8 +208,4 @@ func Results(
 			query = GetNextSliceRing(queries, query)
 		}
 	}
-
-	// There is currently no reason why we may arrive here, but in case we do
-	// someday, perform some clean-up.
-	close(pauseDisplayChan)
 }
