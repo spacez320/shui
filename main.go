@@ -54,9 +54,10 @@ var (
 	port        string     // Port for RPC.
 	queries     queriesArg // Queries to execute.
 	silent      bool       // Whether or not to be quiet.
-	valueLabels string     // Result value labels.
+	labels      string     // Result value labels.
 
-	logger                 = log.Default() // Logging system.
+	ctx                    = context.Background() // Initialize context.
+	logger                 = log.Default()        // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
 		"debug": slog.LevelDebug,
 		"error": slog.LevelError,
@@ -95,7 +96,7 @@ func main() {
 	flag.StringVar(&filters, "f", "", "Results filters.")
 	flag.StringVar(&logLevel, "l", "error", "Log level.")
 	flag.StringVar(&port, "p", "12345", "Port for RPC.")
-	flag.StringVar(&valueLabels, "v", "", "Labels to apply to query values, separated by commas.")
+	flag.StringVar(&labels, "v", "", "Labels to apply to query values, separated by commas.")
 	flag.Var(&queries, "q", "Query to execute. When in query mode, this is expected to be some command. When in profile mode it is expected to be PID.")
 	flag.Parse()
 
@@ -123,6 +124,9 @@ func main() {
 			delay,
 			port,
 		)
+
+		// Process mode has specific labels--ignore user provided ones.
+		ctx = context.WithValue(ctx, "labels", lib.ProfileLabels)
 	case mode == int(MODE_QUERY):
 		slog.Debug("Executing in query mode.")
 
@@ -133,6 +137,9 @@ func main() {
 			delay,
 			port,
 		)
+
+		// Rely on user-defined labels.
+		ctx = context.WithValue(ctx, "labels", parseCommaDelimitedArg(labels))
 	case mode == int(MODE_READ):
 		slog.Debug("Executing in read mode.")
 
@@ -143,8 +150,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize context.
-	ctx := context.Background()
+	// Initialize remaining context.
+	ctx = context.WithValue(ctx, "filters", parseCommaDelimitedArg(filters))
 	ctx = context.WithValue(ctx, "queries", queries.ToStrings())
 
 	// Execute result viewing.
@@ -153,8 +160,6 @@ func main() {
 			ctx,
 			lib.DisplayMode(displayMode),
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
-			parseCommaDelimitedArg(valueLabels),
-			parseCommaDelimitedArg(filters),
 			lib.Config{
 				LogLevel: logLevel,
 			},

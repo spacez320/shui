@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"golang.org/x/exp/slog"
@@ -47,14 +48,16 @@ func runQuery(
 
 // Executes a query as a process to profile.
 func runQueryProfile(pid string) {
-	slog.Debug(fmt.Sprintf("Executing profile for PID: '%s' ...\n", pid))
+	slog.Debug(fmt.Sprintf("Executing profile for PID: '%s' ...", pid))
 
-	AddResult(pid, runProfile(pid))
+	pidInt, err := strconv.Atoi(pid)
+	e(err)
+	AddResult(pid, runProfile(pidInt))
 }
 
 // Executes a query as a command to exec.
 func runQueryExec(query string) {
-	slog.Debug(fmt.Sprintf("Executing query: '%s' ...\n", query))
+	slog.Debug(fmt.Sprintf("Executing query: '%s' ...", query))
 
 	// Prepare query execution.
 	cmd := exec.Command("bash", "-c", query)
@@ -73,14 +76,14 @@ func runQueryExec(query string) {
 	cmd_stderr_output, cmd_stderr_output_err := io.ReadAll(stderr)
 	e(cmd_stderr_output_err)
 	if len(cmd_stderr_output) != 0 {
-		slog.Error(fmt.Sprintf("Query '%s' error is: \n%s\n", query, cmd_stderr_output))
+		slog.Error(fmt.Sprintf("Query '%s' error is: %s", query, cmd_stderr_output))
 	}
 
 	// Interpret results.
 	cmd_output, cmd_output_err := io.ReadAll(stdout)
 	e(cmd_output_err)
 	AddResult(query, string(cmd_output))
-	slog.Debug(fmt.Sprintf("Query '%s' result is: \n%s\n", query, cmd_output))
+	slog.Debug(fmt.Sprintf("Query '%s' result is: %s", query, cmd_output))
 
 	// Clean-up.
 	cmd.Wait()

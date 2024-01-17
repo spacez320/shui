@@ -141,10 +141,15 @@ func Results(
 	ctx context.Context,
 	displayMode DisplayMode,
 	query string,
-	labels, filters []string,
 	inputConfig Config,
 	inputPauseQueryChans map[string]chan bool,
 ) {
+	var (
+		queries = ctx.Value("queries").([]string) // Capture queries from context.
+		filters = ctx.Value("filters").([]string) // Capture filters from context.
+		labels  = ctx.Value("labels").([]string)  // Capture labels from context.
+	)
+
 	// Assign global config and global control channels.
 	config = inputConfig
 	pauseQueryChans = inputPauseQueryChans
@@ -155,9 +160,6 @@ func Results(
 	for _, pauseQueryChan := range pauseQueryChans {
 		defer close(pauseQueryChan)
 	}
-
-	// Capture queries from context.
-	queries := ctx.Value("queries").([]string)
 
 	// Iniitialize reader indexes.
 	readerIndexes = make(map[string]*storage.ReaderIndex, len(queries))
