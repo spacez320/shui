@@ -38,23 +38,31 @@ func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 	switch key.Key {
 	case keyboard.KeyEsc:
 		// Escape quits the program.
+		slog.Debug("Quitting ...")
+
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		cancel()
 		appTermdash.Close()
 	case keyboard.KeyTab:
 		// Tab switches display modes.
+		slog.Debug("Next ...")
+
 		interruptChan <- true
 		currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
 		cancel()
 		appTermdash.Close()
 	case 'n':
 		// 'n' switches queries.
+		slog.Debug("Next query ...")
+
 		interruptChan <- true
 		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
 		cancel()
 		appTermdash.Close()
 	case ' ':
 		// Space pauses.
+		slog.Debug("Pausing ...")
+
 		pauseDisplayChan <- true
 		pauseQueryChans[currentCtx.Value("query").(string)] <- true
 	}

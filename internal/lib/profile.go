@@ -23,7 +23,7 @@ var (
 		"T": "stopped via signal",
 		"t": "stopped via debugger",
 		"Z": "zombie",
-	}
+	} // Map of show to long process states.
 
 	ProfileLabels = []string{
 		"Process State",
