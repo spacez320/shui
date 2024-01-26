@@ -49,7 +49,7 @@ func resetContext(query string) {
 	currentCtx = context.WithValue(currentCtx, "query", query)
 }
 
-// Adds a result to the result store.
+// Adds a result to the result store based on a string.
 func AddResult(query, result string) {
 	result = strings.TrimSpace(result)
 	store.Put(query, result, TokenizeResult(result)...)
@@ -141,16 +141,25 @@ func Results(
 	ctx context.Context,
 	displayMode DisplayMode,
 	query string,
-	labels, filters []string,
 	inputConfig Config,
 	inputPauseQueryChans map[string]chan bool,
 ) {
+	var (
+		filters = ctx.Value("filters").([]string) // Capture filters from context.
+		labels  = ctx.Value("labels").([]string)  // Capture labels from context.
+		queries = ctx.Value("queries").([]string) // Capture queries from context.
+	)
+
 	// Assign global config and global control channels.
 	config = inputConfig
 	pauseQueryChans = inputPauseQueryChans
 
-	// Capture queries from context.
-	queries := ctx.Value("queries").([]string)
+	// There is currently no reason why we may arrive at deffers, but in case we
+	// do someday, perform some clean-up.
+	defer close(pauseDisplayChan)
+	for _, pauseQueryChan := range pauseQueryChans {
+		defer close(pauseQueryChan)
+	}
 
 	// Iniitialize reader indexes.
 	readerIndexes = make(map[string]*storage.ReaderIndex, len(queries))
@@ -189,6 +198,7 @@ func Results(
 		// situation, restart the results display, adjusting for context.
 		if currentCtx.Value("quit").(bool) {
 			// Guess I'll die.
+			displayQuit()
 			os.Exit(0)
 		}
 		if currentCtx.Value("advanceDisplayMode").(bool) {
@@ -200,8 +210,4 @@ func Results(
 			query = GetNextSliceRing(queries, query)
 		}
 	}
-
-	// There is currently no reason why we may arrive here, but in case we do
-	// someday, perform some clean-up.
-	close(pauseDisplayChan)
 }

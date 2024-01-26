@@ -60,9 +60,9 @@ var (
 // Starts the display. Applies contextual logic depending on the provided
 // display driver. Expects a function to execute within a goroutine to update
 // the display.
-func display(driver DisplayDriver, f func()) {
+func display(driver DisplayDriver, displayUpdateFunc func()) {
 	// Execute the update function.
-	go f()
+	go displayUpdateFunc()
 
 	switch driver {
 	case DISPLAY_TVIEW:
@@ -75,9 +75,18 @@ func display(driver DisplayDriver, f func()) {
 	}
 }
 
+// Clean-up display logic when fully quitting.
+func displayQuit() {
+	close(interruptChan)
+}
+
 // Creates help text for any display.
-func helpText(query string) string {
-	return HELP_TEXT + fmt.Sprintf("\nQuery: %v", query) // Text to display in the help pane.
+func helpText() string {
+	return HELP_TEXT + fmt.Sprintf(
+		"\nQuery: %v | Labels: %v | Filters: %v",
+		currentCtx.Value("query"),
+		currentCtx.Value("labels"),
+		currentCtx.Value("filters"))
 }
 
 // Presents raw output.
@@ -92,7 +101,7 @@ func RawDisplay(query string) {
 // Update the results pane with new results as they are generated.
 func StreamDisplay(query string) {
 	// Initialize the display.
-	resultsView, _, _ := initDisplayTviewText(helpText(query))
+	resultsView, _, _ := initDisplayTviewText(helpText())
 
 	// Start the display.
 	display(
@@ -138,7 +147,7 @@ func TableDisplay(query string, filters []string) {
 	)
 
 	// Initialize the display.
-	resultsView, _, _ := initDisplayTviewTable(helpText(query))
+	resultsView, _, _ := initDisplayTviewTable(helpText())
 
 	// Start the display.
 	display(
@@ -253,7 +262,7 @@ func GraphDisplay(query string, filters []string) {
 	// Initialize the help view.
 	helpWidget, err := text.New()
 	e(err)
-	helpWidget.Write(helpText(query))
+	helpWidget.Write(helpText())
 
 	// Initialize the logs view.
 	logsWidget, err := text.New()

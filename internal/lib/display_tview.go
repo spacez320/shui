@@ -24,12 +24,16 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 	switch key := event.Key(); key {
 	case tcell.KeyEscape:
 		// Escape quits the program.
+		slog.Debug("Quitting.")
+
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		appTview.Stop()
 	case tcell.KeyRune:
 		switch event.Rune() {
 		case 'n':
 			// 'n' switches queries.
+			slog.Debug("Switching query.")
+
 			go func() {
 				// When a user presses Tab, stop the display but continue running.
 				interruptChan <- true
@@ -38,6 +42,8 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 			}()
 		case ' ':
 			// Space pauses.
+			slog.Debug("Pausing.")
+
 			go func() {
 				pauseDisplayChan <- true
 				pauseQueryChans[currentCtx.Value("query").(string)] <- true
@@ -45,6 +51,8 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 		}
 	case tcell.KeyTab:
 		// Tab switches display modes.
+		slog.Debug("Switching display mode.")
+
 		go func() {
 			interruptChan <- true
 			currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
