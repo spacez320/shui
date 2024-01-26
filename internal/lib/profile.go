@@ -26,12 +26,15 @@ var (
 	} // Map of show to long process states.
 
 	ProfileLabels = []string{
-		"Process State",
+		"State",
 		"Age (s)",
 		"Threads",
 		"CPU Usage (%)",
 		"Resident Memory (GB)",
 		"Virtual Memory (GB)",
+		"Swap (GB)",
+		"IO Read (MB)",
+		"IO Write (MB)",
 	} // Labels supplied for profile results.
 )
 
@@ -50,27 +53,33 @@ func byteConv(bytes int, level string) (convBytes float64, err error) {
 		divisor = 1000
 	default:
 		err = fmt.Errorf("Bad byte conversion: %s", level)
-		return 0, err
 	}
 
-	return float64(bytes) / float64(divisor), nil
+	if divisor > 0 {
+		convBytes = float64(bytes) / float64(divisor)
+	}
+
+	return
 }
 
 // Executes a pprof on a specific process, isolating specific data.
-func runProfile(pid int) (result string) {
+func runProfile(pid int) string {
 	var (
 		uptime float64 // Total system uptime.
 	)
 
+	// Read /proc/[pid] data.
 	proc, err := procfs.NewProc(pid)
 	e(err)
-
-	// Reads /proc/[pid]/stat.
-	stat, err := proc.Stat()
+	procSmap, err := proc.ProcSMapsRollup() // Reads /proc/[pid]/smaps_rollup.
+	e(err)
+	procIO, err := proc.IO() // Reads /proc/[pid]/io.
+	e(err)
+	procStat, err := proc.Stat() // Read /proc/[pid]/stat.
 	e(err)
 
 	// Calculate CPU usage.
-	startTime, err := stat.StartTime()
+	startTime, err := procStat.StartTime()
 	e(err)
 	procUptime, err := os.Open("/proc/uptime")
 	e(err)
@@ -80,19 +89,27 @@ func runProfile(pid int) (result string) {
 		uptime, err = strconv.ParseFloat(strings.Split(scanner.Text(), " ")[0], 10)
 	}
 
+	// Calculate IO usage.
+	read, err := byteConv(int(procIO.ReadBytes), "megabyte")
+	e(err)
+	write, err := byteConv(int(procIO.WriteBytes), "megabyte")
+	e(err)
+
 	// Calculate memory usage.
-	rssM, err := byteConv(stat.ResidentMemory(), "gigabyte")
-	virtM, err := byteConv(int(stat.VirtualMemory()), "gigabyte")
+	rss, err := byteConv(procStat.ResidentMemory(), "gigabyte")
+	virt, err := byteConv(int(procStat.VirtualMemory()), "gigabyte")
+	swap, err := byteConv(int(procSmap.Swap), "gigabyte")
 
-	result = fmt.Sprintf(
-		"%s %d %d %f %f %f",
-		processState[stat.State],
+	return fmt.Sprintf(
+		"%s %d %d %f %f %f %f %f %f",
+		processState[procStat.State],
 		time.Now().Unix()-int64(startTime),
-		stat.NumThreads,
-		(stat.CPUTime()/uptime)*100,
-		rssM,
-		virtM,
+		procStat.NumThreads,
+		(procStat.CPUTime()/uptime)*100,
+		rss,
+		virt,
+		swap,
+		read,
+		write,
 	)
-
-	return
 }
