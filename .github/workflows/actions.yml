@@ -29,6 +29,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: release --clean --skip-announce --snapshot
+          args: release --clean --skip=announce
           distribution: goreleaser
           version: latest
