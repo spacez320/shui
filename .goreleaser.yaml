@@ -1,0 +1,29 @@
+version: 1
+
+# Disable all announcements.
+announce:
+  skip: true
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+before:
+  hooks:
+    - go mod tidy
+    # - go generate ./...  # Leaving for future use.
+
+builds:
+  - goos:
+      - darwin
+      - linux
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+# Produce a stock checksum file.
+checksum: {}

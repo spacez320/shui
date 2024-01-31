@@ -1,2 +1,2 @@
-# Ignore binary assets.
-cryptarch
+# Ignore release assets.
+dist/

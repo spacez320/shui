@@ -1,5 +1,8 @@
-name: Cryptarch
-on: [push]
+name: cryptarch
+
+on:
+  - push
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -9,3 +12,20 @@ jobs:
         run: |
           go test
           go test **/*
+
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v4
+        with:
+          go-version: stable
+      - uses: goreleaser/goreleaser-action@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: release --clean --skip-announce --snapshot
+          distribution: goreleaser
+          version: latest
