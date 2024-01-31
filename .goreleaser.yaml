@@ -1,9 +1,5 @@
 version: 1
 
-# Disable all announcements.
-announce:
-  skip: true
-
 archives:
   - format: tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
