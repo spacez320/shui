@@ -1,24 +1,21 @@
 //
 // Storage management for query results.
 //
-// The storage engine is a simple, time-series indexed, multi-type data store.
-// It interfaces as a Go library in a few ways, namely:
+// The storage engine is a simple, time-series indexed, multi-type data store. It interfaces as a Go
+// library in a few ways, namely:
 //
 // - It can be used as a library.
 // - It can broadcast events into public Go channels.
 // - It can broadcast events via RPC.
 //
-// Results are stored simply in an ordered sequence, and querying time is
-// linear.
+// Results are stored simply in an ordered sequence, and querying time is linear.
 
 package storage
 
 import (
-	"fmt"
-	"reflect"
+	"io"
+	"os"
 	"time"
-
-	"golang.org/x/exp/slices"
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,24 +23,6 @@ import (
 // Types
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Individual result.
-type Result struct {
-	// Time the result was created.
-	Time time.Time
-	// Raw value of the result.
-	Value interface{}
-	// Tokenized value of the result.
-	Values []interface{}
-}
-
-// Collection of results.
-type Results struct {
-	// Meta field for result values acting as a name, corresponding by index.
-	Labels []string
-	// Stored results.
-	Results []Result
-}
 
 type ReaderIndex int
 
@@ -60,72 +39,23 @@ const (
 	// Size of Put channels. This is the amount of results that may accumulate if
 	// not being actively consumed.
 	PUT_EVENT_CHANNEL_SIZE = 128
+
+	// Persistent storage path.
+	STORAGE_FILE = "/tmp/storage"
 )
 
-// Channels for broadcasting Put calls.
-var PutEvents = make(map[string](chan Result))
+var (
+	storageF      *os.File      // File for storage writes.
+	storageWriter io.ByteWriter // Writer for storage.
+
+	PutEvents = make(map[string](chan Result)) // Channels for broadcasting Put calls.
+)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Private
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Get a result based on a timestamp.
-func (r *Results) get(time time.Time) Result {
-	for _, result := range (*r).Results {
-		if result.Time.Compare(time) == 0 {
-			// We found a result to return.
-			return result
-		}
-	}
-
-	// Return an empty result if nothing was discovered.
-	return Result{}
-}
-
-// Gets results based on a start and end timestamp.
-func (r *Results) getRange(startTime time.Time, endTime time.Time) (found []Result) {
-	for _, result := range (*r).Results {
-		if result.Time.Compare(startTime) >= 0 {
-			if result.Time.Compare(endTime) > 0 {
-				// Break out of the loop if we've exhausted the upper bounds of the
-				// range.
-				break
-			} else {
-				found = append(found, result)
-			}
-		}
-	}
-
-	return
-}
-
-// Given a filter, return the corresponding value index.
-func (r *Results) getValueIndex(filter string) int {
-	return slices.Index((*r).Labels, filter)
-}
-
-// Put a new compound result.
-func (r *Results) put(value string, values ...interface{}) Result {
-	next := Result{
-		Time:   time.Now(),
-		Value:  value,
-		Values: values,
-	}
-
-	(*r).Results = append((*r).Results, next)
-
-	return next
-}
-
-// Show all currently stored results.
-func (r *Results) show() {
-	for _, result := range (*r).Results {
-		fmt.Printf("Label: %v, Time: %v, Value: %v, Values: %v\n",
-			(*r).Labels, result.Time, result.Value, result.Values)
-	}
-}
 
 // Incremement a reader index, likely after a read.
 func (i *ReaderIndex) inc() {
@@ -139,13 +69,14 @@ func (i *ReaderIndex) inc() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Initializes a new storage.
-func NewStorage() Storage {
-	return Storage{}
+func NewStorage() (storage Storage, err error) {
+	storageF, err = os.Create(STORAGE_FILE)
+	return
 }
 
-// Determines whether this is an empty result.
-func (r *Result) IsEmpty() bool {
-	return reflect.DeepEqual(*r, Result{})
+// Closes a storage.
+func (s *Storage) Close() {
+	storageF.Close()
 }
 
 // Get a result based on a timestamp.
@@ -220,6 +151,9 @@ func (s *Storage) Put(query string, value string, values ...interface{}) Result 
 	case PutEvents[query] <- result:
 	default:
 	}
+
+	// Persist data to disk.
+	storageF.Write([]byte(result.Value.(string)))
 
 	return result
 }
