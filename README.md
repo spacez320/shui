@@ -10,6 +10,11 @@ things in a CLI.
 
 This project is in an active, "alpha" development phase, but should still be useable.
 
+Setup
+-----
+
+Binaries are available from [the releases page](https://github.com/spacez320/cryptarch/releases).
+
 Usage
 -----
 
@@ -18,49 +23,46 @@ Cryptarch expects a **Query** to gather data with (e.g. a CLI command like `whoa
 
 ### Modes
 
-Cryptarch has **Modes"**.
+Cryptarch has **"modes"**.
 
 **Query mode** is the default and is for running shell commands.
 
-<<example>>
+![Demo of query mode](https://raw.githubusercontent.com/spacez320/cryptarch/53cf72e8a181a911988d2ec45bd0cab6ca653cc6/media/query-mode.gif)
 
 **Profile mode** is like Query mode except specialized for inspecting systems or processes.
 
-<<example>>
+![Demo of profile mode](https://raw.githubusercontent.com/spacez320/cryptarch/53cf72e8a181a911988d2ec45bd0cab6ca653cc6/media/process-mode.gif)
 
 ### Displays
 
-Cryptarch also has **"Displays"** that determine how data is presented.
+Cryptarch also has **"displays"** that determine how data is presented.
 
-**Stream display** just presents incoming data.
-
-<<example>>
+**Raw display** and **Stream display** just presents incoming data, the latter being within
+Cryptarch's interactive window. The examples above use stream displays.
 
 **Table display** will parse results into a table.
 
-<<example>>
+![Demo of table display](https://raw.githubusercontent.com/spacez320/cryptarch/53cf72e8a181a911988d2ec45bd0cab6ca653cc6/media/table-display.gif)
 
 **Graph display** will target a specific field in a result and graph it.
 
-<<example>>
+![Demo of graph display](https://raw.githubusercontent.com/spacez320/cryptarch/53cf72e8a181a911988d2ec45bd0cab6ca653cc6/media/graph-display.gif)
 
 ### More Examples
 
 > The examples below have been tested on `GNU bash, version 5.2.15(1)-release`.
 
 ```sh
+# See help.
+cryptarch -h
+
 # Execute `whoami` once, printing results to the console.
 cryptarch -q 'whoami'
 
 # Execute `uptime` continuously, printing results to the console.
 cryptarch -q 'uptime' -t -1
 
-# Get the size of an NVME used space.
-cryptarch -q 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\'''
-
-# Do the same thing, but silently in the background. Then retrieve results.
-cryptarch -q 'uptime' -s -t -1 &
-cryptarch -m 1
+# Get the size of an NVME used space and output it to a table.
 ```
 
 Future
@@ -70,8 +72,9 @@ I've been adding planned work into [project issues](https://github.com/spacez320
 and [project milestones](https://github.com/spacez320/cryptarch/milestone/1)--take a look there to
 see what's coming.
 
-Big planned improvements include things like:
+Planned improvements include things like:
 
+- Background execution and persistent results.
 - Ability to perform calculations on streams of data, such as aggregates, rates, or quantile math.
 - Better text result management, such as diff'ing.
 - Export data to external systems, such as Prometheus.
