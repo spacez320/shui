@@ -13,9 +13,16 @@
 package storage
 
 import (
+	"encoding/json"
+	_ "fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"sync"
 	"time"
+
+	_ "golang.org/x/exp/slog"
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,13 +46,11 @@ const (
 	// Size of Put channels. This is the amount of results that may accumulate if not being actively
 	// consumed.
 	PUT_EVENT_CHANNEL_SIZE = 128
-	// Persistent storage path.
-	STORAGE_FILE = "/tmp/storage"
 )
 
 var (
-	storageF      *os.File      // File for storage writes.
-	storageWriter io.ByteWriter // Writer for storage.
+	storageF     *os.File   // File for storage writes.
+	storageMutex sync.Mutex // Lock for storage file writes.
 
 	PutEvents = make(map[string](chan Result)) // Channels for broadcasting Put calls.
 )
@@ -61,20 +66,101 @@ func (i *ReaderIndex) inc() {
 	(*i)++
 }
 
+// initializes a new results series in storage. Must be called when a new results series is created.
+func (s *Storage) newResults(query string) {
+	if _, ok := (*s)[query]; !ok {
+		// This is a new query, initialize an empty results.
+		(*s)[query] = &Results{}
+		PutEvents[query] = make(chan Result, PUT_EVENT_CHANNEL_SIZE)
+	}
+}
+
+// Saves current storage to disk. Currently this replaces the entire storage file with all the data
+// in storage (a full write-over).
+func (s *Storage) save() error {
+	var (
+		err         error  // General error holder.
+		storageJson []byte // Bytes as json.
+	)
+
+	// Lock storage to prevent dirty writes.
+	storageMutex.Lock()
+	defer storageMutex.Unlock()
+
+	// Translate current storage into binary json and save it.
+	storageJson, err = json.MarshalIndent(&s, "", "\t")
+	_, err = storageF.WriteAt(storageJson, 0)
+
+	return err
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Public
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Initializes a new storage.
+// Initializes a new storage, loading in any saved storage data.
 func NewStorage() (storage Storage, err error) {
-	storageF, err = os.Create(STORAGE_FILE)
+	var (
+		cryptarchUserCacheDir string              // Cryptarch specific user cache data.
+		storageData           []byte              // Raw read storage data.
+		storageFP             string              // Filepath for storage.
+		storagePre            map[string]*Results // Pre-built storage with existing data.
+		storageStat           fs.FileInfo         // Stat for the storage file.
+		userCacheDir          string              // User cache directory, contextual to OS.
+	)
+
+	// Initialize storage.
 	storage = Storage{}
+
+	// Retrieve the user cache directory.
+	userCacheDir, err = os.UserCacheDir()
+	if err != nil {
+		return
+	}
+
+	// Create the user cache directory for data.
+	cryptarchUserCacheDir = filepath.Join(userCacheDir, "cryptarch")
+	err = os.MkdirAll(cryptarchUserCacheDir, fs.FileMode(0770))
+	if err != nil {
+		return
+	}
+
+	// Instantiate the storage file.
+	storageFP = filepath.Join(cryptarchUserCacheDir, "storage.json")
+	storageF, err = os.OpenFile(
+		storageFP,
+		os.O_CREATE|os.O_RDWR,
+		fs.FileMode(0770),
+	)
+	if err != nil {
+		return
+	}
+
+	if storageStat, err = os.Stat(storageFP); storageStat.Size() > 0 {
+		// There is pre-existing storage data.
+		if err != nil {
+			return
+		}
+
+		// Read in storage data and supply it to storage. We must initialize any results series before
+		// populating data.
+		storageData, err = io.ReadAll(storageF)
+		if err != nil {
+			return
+		}
+		json.Unmarshal(storageData, &storagePre)
+		for query := range storagePre {
+			storage.newResults(query)
+		}
+		storage = storagePre
+	}
+
 	return
 }
 
-// Closes a storage.
+// Closes a storage. Should be called after all storage operations cease.
 func (s *Storage) Close() {
 	storageF.Close()
 }
@@ -107,60 +193,64 @@ func (s *Storage) GetValueIndex(query, filter string) int {
 	return (*s)[query].getValueIndex(filter)
 }
 
-// Initialize a new reader index.
-func (s *Storage) NewReaderIndex() *ReaderIndex {
-	r := ReaderIndex(0)
-	return &r
-}
+// Initialize a new reader index. Will attempt to set the initial value to the end of existing
+// results, if results already exist.
+func (s *Storage) NewReaderIndex(query string) *ReaderIndex {
+	var (
+		r ReaderIndex // Reader index to return the address of.
+	)
 
-// Initializes a new results series in a storage.
-func (s *Storage) NewResults(query string) {
 	if _, ok := (*s)[query]; !ok {
-		// This is a new query, initialize an empty results.
-		(*s)[query] = &Results{}
-		PutEvents[query] = make(chan Result, PUT_EVENT_CHANNEL_SIZE)
+		// There is no data.
+		r = ReaderIndex(0)
+	} else {
+		// There is existing data to account for.
+		r = ReaderIndex(len((*s)[query].Results))
 	}
+
+	return &r
 }
 
 // Retrieve the next result from a put event channel.
 func (s *Storage) Next(query string, index *ReaderIndex) (next Result) {
 	next = <-PutEvents[query]
 	index.inc()
+
 	return
 }
 
-// Retrieve the next result from a put event channel, returning an empty result
-// if nothing exists.
+// Retrieve the next result from a put event channel, returning an empty result if nothing exists.
 func (s *Storage) NextOrEmpty(query string, index *ReaderIndex) (next Result) {
 	select {
 	case next = <-PutEvents[query]:
 		index.inc()
 	default:
 	}
+
 	return
 }
 
 // Put a new compound result.
-func (s *Storage) Put(query string, value string, values ...interface{}) Result {
-	s.NewResults(query)
+func (s *Storage) Put(query string, value string, values ...interface{}) (Result, error) {
+	s.newResults(query)
 	result := (*s)[query].put(value, values...)
 
-	// Send a non-blocking put event. Put events are lossy and clients may lose
-	// information if not actively listening.
+	// Send a non-blocking put event. Put events are lossy and clients may lose information if not
+	// actively listening.
 	select {
 	case PutEvents[query] <- result:
 	default:
 	}
 
 	// Persist data to disk.
-	// storageF.Write([]byte(result.Value.(string)))
+	err := s.save()
 
-	return result
+	return result, err
 }
 
 // Assigns labels to a results series.
 func (s *Storage) PutLabels(query string, labels []string) {
-	s.NewResults(query)
+	s.newResults(query)
 	(*s)[query].Labels = labels
 }
 

@@ -91,6 +91,12 @@ func helpText() string {
 
 // Presents raw output.
 func RawDisplay(query string) {
+	// Load existing results.
+	for _, result := range store.GetToIndex(query, readerIndexes[query]) {
+		fmt.Println(result)
+	}
+
+	// Load new results.
 	for {
 		fmt.Println(GetResult(query))
 	}
@@ -130,6 +136,7 @@ func StreamDisplay(query string) {
 					<-pauseDisplayChan
 				default:
 					// We can display the next result.
+					slog.Debug(fmt.Sprintf("Now waiting for new results."))
 					fmt.Fprintln(resultsView, (GetResult(query)).Value)
 				}
 			}

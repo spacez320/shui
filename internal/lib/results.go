@@ -52,7 +52,8 @@ func resetContext(query string) {
 // Adds a result to the result store based on a string.
 func AddResult(query, result string) {
 	result = strings.TrimSpace(result)
-	store.Put(query, result, TokenizeResult(result)...)
+	_, err := store.Put(query, result, TokenizeResult(result)...)
+	e(err)
 }
 
 // Retrieves a next result.
@@ -167,7 +168,7 @@ func Results(
 	// Iniitialize reader indexes.
 	readerIndexes = make(map[string]*storage.ReaderIndex, len(queries))
 	for _, query := range queries {
-		readerIndexes[query] = store.NewReaderIndex()
+		readerIndexes[query] = store.NewReaderIndex(query)
 	}
 
 	for {
