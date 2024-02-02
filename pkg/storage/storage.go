@@ -36,10 +36,9 @@ type Storage map[string]*Results
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const (
-	// Size of Put channels. This is the amount of results that may accumulate if
-	// not being actively consumed.
+	// Size of Put channels. This is the amount of results that may accumulate if not being actively
+	// consumed.
 	PUT_EVENT_CHANNEL_SIZE = 128
-
 	// Persistent storage path.
 	STORAGE_FILE = "/tmp/storage"
 )
@@ -71,6 +70,7 @@ func (i *ReaderIndex) inc() {
 // Initializes a new storage.
 func NewStorage() (storage Storage, err error) {
 	storageF, err = os.Create(STORAGE_FILE)
+	storage = Storage{}
 	return
 }
 
@@ -153,7 +153,7 @@ func (s *Storage) Put(query string, value string, values ...interface{}) Result 
 	}
 
 	// Persist data to disk.
-	storageF.Write([]byte(result.Value.(string)))
+	// storageF.Write([]byte(result.Value.(string)))
 
 	return result
 }
