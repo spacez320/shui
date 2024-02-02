@@ -91,11 +91,9 @@ func helpText() string {
 
 // Presents raw output.
 func RawDisplay(query string) {
-	go func() {
-		for {
-			fmt.Println(GetResult(query))
-		}
-	}()
+	for {
+		fmt.Println(GetResult(query))
+	}
 }
 
 // Update the results pane with new results as they are generated.
