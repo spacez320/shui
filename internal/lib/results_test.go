@@ -21,7 +21,7 @@ func TestFilterResult(t *testing.T) {
 	testResults := storage.Results{
 		Labels: []string{"fizz"},
 		Results: []storage.Result{
-			storage.Result{
+			{
 				Time:   testTime,
 				Value:  "foo bar",
 				Values: testResultValues,

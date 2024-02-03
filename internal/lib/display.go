@@ -57,9 +57,8 @@ var (
 	interruptChan = make(chan bool) // Channel for interrupting displays.
 )
 
-// Starts the display. Applies contextual logic depending on the provided
-// display driver. Expects a function to execute within a goroutine to update
-// the display.
+// Starts the display. Applies contextual logic depending on the provided display driver. Expects a
+// function to execute within a goroutine to update the display.
 func display(driver DisplayDriver, displayUpdateFunc func()) {
 	// Execute the update function.
 	go displayUpdateFunc()
@@ -125,8 +124,7 @@ func StreamDisplay(query string) {
 
 			// Print results.
 			for {
-				// Listen for an interrupt event to stop result consumption in
-				// preparation for some display change.
+				// Listen for an interrupt to stop result consumption for some display change.
 				select {
 				case <-interruptChan:
 					// We've received an interrupt.
@@ -136,7 +134,6 @@ func StreamDisplay(query string) {
 					<-pauseDisplayChan
 				default:
 					// We can display the next result.
-					slog.Debug(fmt.Sprintf("Now waiting for new results."))
 					fmt.Fprintln(resultsView, (GetResult(query)).Value)
 				}
 			}
@@ -163,8 +160,8 @@ func TableDisplay(query string, filters []string) {
 				i               = 0    // Used to determine the next row index.
 			)
 
-			// Determine the value indexes to populate into the graph. If no filter is
-			// provided, the index is assumed to be zero.
+			// Determine the value indexes to populate into the graph. If no filter is provided, the index
+			// is assumed to be zero.
 			if len(filters) > 0 {
 				for _, filter := range filters {
 					valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
@@ -209,8 +206,7 @@ func TableDisplay(query string, filters []string) {
 
 			// Print results.
 			for {
-				// Listen for an interrupt event to stop result consumption in
-				// preparation for some display change.
+				// Listen for an interrupt to stop result consumption for some display change.
 				select {
 				case <-interruptChan:
 					// We've received an interrupt.
@@ -251,8 +247,7 @@ func GraphDisplay(query string, filters []string) {
 		valueIndex = 0 // Index of the result value to graph.
 	)
 
-	// Determine the values to populate into the graph. If no filter is provided,
-	// the first value is taken.
+	// Determine the values to populate into the graph. If none is provided, the first value is taken.
 	if len(filters) > 0 {
 		valueIndex = store.GetValueIndex(query, filters[0])
 	}
@@ -296,8 +291,7 @@ func GraphDisplay(query string, filters []string) {
 			}
 
 			for {
-				// Listen for an interrupt event to stop result consumption in
-				// preparation for some display change.
+				// Listen for an interrupt to stop result consumption for some display change.
 				select {
 				case <-interruptChan:
 					// We've received an interrupt.
@@ -320,7 +314,7 @@ func GraphDisplay(query string, filters []string) {
 		},
 	)
 
-	// Initialize the display. This must happen after the display function is
-	// invoked, otherwise data will never appear.
+	// Initialize the display. This must happen after the display function is invoked, otherwise data
+	// will never appear.
 	initDisplayTermdash(resultWidget, helpWidget, &logsWidgetWriter.text)
 }

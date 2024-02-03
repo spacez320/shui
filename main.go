@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -66,8 +66,8 @@ var (
 	} // Log levels acceptable as a flag.
 )
 
-// Parses a comma delimited argument string, returning a slice of strings if
-// any are found, or an empty slice if not.
+// Parses a comma delimited argument string, returning a slice of strings if any are found, or an
+// empty slice if not.
 func parseCommaDelimitedArg(arg string) []string {
 	if parsed := strings.Split(arg, ","); parsed[0] == "" {
 		return []string{}
@@ -103,7 +103,7 @@ func main() {
 	// Set-up logging.
 	if silent || displayMode == int(lib.DISPLAY_MODE_GRAPH) {
 		// Silence all output.
-		logger.SetOutput(ioutil.Discard)
+		logger.SetOutput(io.Discard)
 	} else {
 		// Set the default to be standard error--result modes may change this.
 		slog.SetDefault(slog.New(slog.NewTextHandler(

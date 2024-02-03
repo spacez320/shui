@@ -16,12 +16,12 @@ func testResults() Results {
 	return Results{
 		Labels: []string{"foo", "bar"},
 		Results: []Result{
-			Result{
+			{
 				Time:   testTime,
 				Value:  "foo",
 				Values: nil,
 			},
-			Result{
+			{
 				Time:   testTime.Add(time.Second * 30),
 				Value:  "bar",
 				Values: nil,
