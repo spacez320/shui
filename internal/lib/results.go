@@ -50,9 +50,9 @@ func resetContext(query string) {
 }
 
 // Adds a result to the result store based on a string.
-func AddResult(query, result string) {
+func AddResult(query, result string, history bool) {
 	result = strings.TrimSpace(result)
-	_, err := store.Put(query, result, TokenizeResult(result)...)
+	_, err := store.Put(query, result, history, TokenizeResult(result)...)
 	e(err)
 }
 
@@ -142,6 +142,7 @@ func Results(
 	ctx context.Context,
 	displayMode DisplayMode,
 	query string,
+	history bool,
 	inputConfig Config,
 	inputPauseQueryChans map[string]chan bool,
 ) {
@@ -154,7 +155,7 @@ func Results(
 	)
 
 	// Initialize storage.
-	store, err = storage.NewStorage()
+	store, err = storage.NewStorage(history)
 	e(err)
 	defer store.Close()
 

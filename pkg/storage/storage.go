@@ -101,7 +101,7 @@ func (s *Storage) save() error {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Initializes a new storage, loading in any saved storage data.
-func NewStorage() (storage Storage, err error) {
+func NewStorage(persistence bool) (storage Storage, err error) {
 	var (
 		cryptarchUserCacheDir string              // Cryptarch specific user cache data.
 		storageData           []byte              // Raw read storage data.
@@ -113,6 +113,11 @@ func NewStorage() (storage Storage, err error) {
 
 	// Initialize storage.
 	storage = Storage{}
+
+	// If we have disabled persistence, simply return the new storage instance.
+	if !persistence {
+		return
+	}
 
 	// Retrieve the user cache directory.
 	userCacheDir, err = os.UserCacheDir()
@@ -231,9 +236,13 @@ func (s *Storage) NextOrEmpty(query string, index *ReaderIndex) (next Result) {
 }
 
 // Put a new compound result.
-func (s *Storage) Put(query string, value string, values ...interface{}) (Result, error) {
+func (s *Storage) Put(
+	query, value string,
+	persistence bool,
+	values ...interface{},
+) (result Result, err error) {
 	s.newResults(query)
-	result := (*s)[query].put(value, values...)
+	result = (*s)[query].put(value, values...)
 
 	// Send a non-blocking put event. Put events are lossy and clients may lose information if not
 	// actively listening.
@@ -243,9 +252,11 @@ func (s *Storage) Put(query string, value string, values ...interface{}) (Result
 	}
 
 	// Persist data to disk.
-	err := s.save()
+	if persistence {
+		err = s.save()
+	}
 
-	return result, err
+	return
 }
 
 // Assigns labels to a results series.

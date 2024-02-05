@@ -49,6 +49,7 @@ var (
 	delay       int        // Delay between queries.
 	displayMode int        // Result mode to display.
 	filters     string     // Result filters.
+	history     bool       // Whether or not to preserve or use historical results.
 	logLevel    string     // Log level.
 	mode        int        // Mode to execute in.
 	port        string     // Port for RPC.
@@ -88,15 +89,16 @@ func main() {
 	}
 
 	// Define arguments.
+	flag.BoolVar(&history, "e", true, "Whether or not to use or preserve history.")
 	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
 	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
 	flag.IntVar(&displayMode, "r", int(lib.DISPLAY_MODE_RAW), "Result mode to display.")
 	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
 	flag.StringVar(&filters, "f", "", "Results filters.")
+	flag.StringVar(&labels, "v", "", "Labels to apply to query values, separated by commas.")
 	flag.StringVar(&logLevel, "l", "error", "Log level.")
 	flag.StringVar(&port, "p", "12345", "Port for RPC.")
-	flag.StringVar(&labels, "v", "", "Labels to apply to query values, separated by commas.")
 	flag.Var(&queries, "q", "Query to execute. When in query mode, this is expected to be some command. When in profile mode it is expected to be PID.")
 	flag.Parse()
 
@@ -119,10 +121,11 @@ func main() {
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_PROFILE,
-			queries,
 			attempts,
 			delay,
+			queries,
 			port,
+			history,
 		)
 
 		// Process mode has specific labels--ignore user provided ones.
@@ -132,10 +135,11 @@ func main() {
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_COMMAND,
-			queries,
 			attempts,
 			delay,
+			queries,
 			port,
+			history,
 		)
 
 		// Rely on user-defined labels.
@@ -160,6 +164,7 @@ func main() {
 			ctx,
 			lib.DisplayMode(displayMode),
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
+			history,
 			lib.Config{
 				LogLevel: logLevel,
 			},
