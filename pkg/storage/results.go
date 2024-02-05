@@ -1,3 +1,6 @@
+//
+// Manages individual or series of results for storage.
+
 package storage
 
 import (
