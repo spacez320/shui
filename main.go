@@ -1,3 +1,6 @@
+//
+// Entrypoint for cryptarch execution.
+
 package main
 
 import (
@@ -167,7 +170,9 @@ func main() {
 		)
 	}
 
-	defer close(doneQueriesChan)
-
+	// XXX This isn't strictly necessary, mainly because getting here shouldn't be possible
+	// (`lib.Results` does not have any intentional return condition), but it's being left here in
+	// case in the future we do want to control for query completion.
 	<-doneQueriesChan
+	close(doneQueriesChan)
 }

@@ -206,7 +206,7 @@ func Results(
 		if currentCtx.Value("quit").(bool) {
 			// Guess I'll die.
 			displayQuit()
-			break
+			os.Exit(0)
 		}
 		if currentCtx.Value("advanceDisplayMode").(bool) {
 			// Adjust the display mode.
