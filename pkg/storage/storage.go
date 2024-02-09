@@ -50,8 +50,8 @@ const (
 )
 
 var (
-	storageFile  *os.File    // File for storage writes.
-	storageMutex *sync.Mutex // Lock for storage file writes.
+	storageFile  *os.File   // File for storage writes.
+	storageMutex sync.Mutex // Lock for storage file writes.
 
 	PutEvents = make(map[string](chan Result)) // Channels for broadcasting put calls.
 )
@@ -61,11 +61,6 @@ var (
 // Private
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Incremement a reader index, likely after a read.
-func (i *ReaderIndex) inc() {
-	(*i)++
-}
 
 // initializes a new results series in storage. Must be called when a new results series is created.
 // This function is idempotent in that it will check if results for a query have already been
@@ -176,6 +171,16 @@ func NewStorage(persistence bool) (storage Storage, err error) {
 	return
 }
 
+// Decrement a reader index, to re-read the last read.
+func (i *ReaderIndex) Dec() {
+	(*i)--
+}
+
+// Incremement a reader index, likely after a read.
+func (i *ReaderIndex) Inc() {
+	(*i)++
+}
+
 // Sets a redaer index to a specified value.
 func (i *ReaderIndex) Set(newI int) {
 	*i = ReaderIndex(newI)
@@ -237,7 +242,7 @@ func (s *Storage) NewReaderIndex(query string) *ReaderIndex {
 // Retrieve the next result from a put event channel, blocking if none exists.
 func (s *Storage) Next(query string, index *ReaderIndex) (next Result) {
 	next = <-PutEvents[query]
-	index.inc()
+	index.Inc()
 
 	return
 }
@@ -247,7 +252,7 @@ func (s *Storage) NextOrEmpty(query string, index *ReaderIndex) (next Result) {
 	select {
 	case next = <-PutEvents[query]:
 		// Only increment the read counter if something consumed the event.
-		index.inc()
+		index.Inc()
 	default:
 	}
 

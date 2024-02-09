@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
+	_ "golang.org/x/exp/slog"
 )
 
 // Individual result.
@@ -46,8 +47,7 @@ func (r *Results) getRange(startTime time.Time, endTime time.Time) (found []Resu
 	for _, result := range (*r).Results {
 		if result.Time.Compare(startTime) >= 0 {
 			if result.Time.Compare(endTime) > 0 {
-				// Break out of the loop if we've exhausted the upper bounds of the
-				// range.
+				// Break out of the loop if we've exhausted the upper bounds of the range.
 				break
 			} else {
 				found = append(found, result)

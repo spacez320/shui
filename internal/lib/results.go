@@ -61,7 +61,7 @@ func GetResult(query string) storage.Result {
 	return store.Next(query, readerIndexes[query])
 }
 
-// Retrieves a next result, waiting for a non-empty return.
+// Retrieves a next result, waiting for a non-empty return in a non-blocking manner.
 func GetResultWait(query string) (result storage.Result) {
 	for {
 		if result = store.NextOrEmpty(query, readerIndexes[query]); result.IsEmpty() {

@@ -94,6 +94,10 @@ func RawDisplay(query string) {
 		reader = readerIndexes[query] // Reader index for the query.
 	)
 
+	// Wait for the first result to appear to synchronize storage.
+	GetResultWait(query)
+	reader.Dec()
+
 	// Load existing results.
 	for _, result := range store.GetToIndex(query, reader) {
 		fmt.Println(result)
@@ -114,10 +118,9 @@ func StreamDisplay(query string) {
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewText(helpText())
 
-	// Wait for the first result to appear to extrapolate display information about it. Afterwards,
-	// rewind the reader index.
+	// Wait for the first result to appear to synchronize storage.
 	GetResultWait(query)
-	reader.Set(0)
+	reader.Dec()
 
 	// Start the display.
 	display(
@@ -163,9 +166,9 @@ func TableDisplay(query string, filters []string) {
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewTable(helpText())
 
-	// Wait for the first result to appear to extrapolate display information about it.
+	// Wait for the first result to appear to synchronize storage.
 	GetResultWait(query)
-	reader.Set(0)
+	reader.Dec()
 
 	// Start the display.
 	display(
