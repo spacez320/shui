@@ -31,14 +31,14 @@ var (
 	driver          DisplayDriver                   // Display driver, dictated by the results.
 	pauseQueryChans map[string]chan bool            // Channels for dealing with 'pause' events for results.
 	readerIndexes   map[string]*storage.ReaderIndex // Reader indexes for queries.
+	store           storage.Storage                 // Stored results.
 
 	ctxDefaults = map[string]interface{}{
 		"advanceDisplayMode": false,
 		"advanceQuery":       false,
 		"quit":               false,
 	} // Defaults applied to context.
-	pauseDisplayChan = make(chan bool)      // Channel for dealing with 'pause' events for the display.
-	store            = storage.NewStorage() // Stored results.
+	pauseDisplayChan = make(chan bool) // Channel for dealing with 'pause' events for the display.
 )
 
 // Resets the current context to its default values.
@@ -50,9 +50,10 @@ func resetContext(query string) {
 }
 
 // Adds a result to the result store based on a string.
-func AddResult(query, result string) {
+func AddResult(query, result string, history bool) {
 	result = strings.TrimSpace(result)
-	store.Put(query, result, TokenizeResult(result)...)
+	_, err := store.Put(query, result, history, TokenizeResult(result)...)
+	e(err)
 }
 
 // Retrieves a next result.
@@ -60,13 +61,13 @@ func GetResult(query string) storage.Result {
 	return store.Next(query, readerIndexes[query])
 }
 
-// Retrieves a next result, waiting for a non-empty return.
+// Retrieves a next result, waiting for a non-empty return in a non-blocking manner.
 func GetResultWait(query string) (result storage.Result) {
 	for {
 		if result = store.NextOrEmpty(query, readerIndexes[query]); result.IsEmpty() {
-			// Wait a tiny bit if we receive an empty result to avoid an excessive
-			// amount of busy waiting. This wait time should be less than the query
-			// delay, otherwise displays will show a release of buffered results.
+			// Wait a tiny bit if we receive an empty result to avoid an excessive amount of busy waiting.
+			// This wait time should be less than the query delay, otherwise displays will show a release
+			// of buffered results.
 			time.Sleep(time.Duration(10) * time.Millisecond)
 		} else {
 			// We found a result.
@@ -141,30 +142,34 @@ func Results(
 	ctx context.Context,
 	displayMode DisplayMode,
 	query string,
+	history bool,
 	inputConfig Config,
 	inputPauseQueryChans map[string]chan bool,
 ) {
 	var (
+		err error // General error holder.
+
 		filters = ctx.Value("filters").([]string) // Capture filters from context.
 		labels  = ctx.Value("labels").([]string)  // Capture labels from context.
 		queries = ctx.Value("queries").([]string) // Capture queries from context.
 	)
 
-	// Assign global config and global control channels.
-	config = inputConfig
-	pauseQueryChans = inputPauseQueryChans
+	// Initialize storage.
+	store, err = storage.NewStorage(history)
+	e(err)
+	defer store.Close()
 
-	// There is currently no reason why we may arrive at deffers, but in case we
-	// do someday, perform some clean-up.
+	// Assign global config and global control channels.
+	config, pauseQueryChans = inputConfig, inputPauseQueryChans
 	defer close(pauseDisplayChan)
 	for _, pauseQueryChan := range pauseQueryChans {
 		defer close(pauseQueryChan)
 	}
 
-	// Iniitialize reader indexes.
+	// Initialize reader indexes.
 	readerIndexes = make(map[string]*storage.ReaderIndex, len(queries))
 	for _, query := range queries {
-		readerIndexes[query] = store.NewReaderIndex()
+		readerIndexes[query] = store.NewReaderIndex(query)
 	}
 
 	for {
@@ -172,8 +177,10 @@ func Results(
 		currentCtx = ctx
 		resetContext(query)
 
-		// Set up labelling or any schema for the results store.
-		store.PutLabels(query, labels)
+		// Set up labelling or any schema for the results store, if any were explicitly provided.
+		if len(labels) > 0 {
+			store.PutLabels(query, labels)
+		}
 
 		switch displayMode {
 		case DISPLAY_MODE_RAW:
@@ -193,9 +200,9 @@ func Results(
 			os.Exit(1)
 		}
 
-		// If we get here, it's because the display functions have returned, probably
-		// because of an interrupt. Assuming we haven't reached some other terminal
-		// situation, restart the results display, adjusting for context.
+		// If we get here, it's because the display functions have returned, probably because of an
+		// interrupt. Assuming we haven't reached some other terminal situation, restart the results
+		// display, adjusting for context.
 		if currentCtx.Value("quit").(bool) {
 			// Guess I'll die.
 			displayQuit()

@@ -48,6 +48,13 @@ Cryptarch's interactive window. The examples above use stream displays.
 
 ![Demo of graph display](https://raw.githubusercontent.com/spacez320/cryptarch/master/media/graph-display.gif)
 
+### Persistence
+
+Cryptarch, by default, will store results and load them when re-executing the same query. Storage is
+located in the user's cache directory.
+
+See: <https://pkg.go.dev/os#UserCacheDir>
+
 ### More Examples
 
 > The examples below have been tested on `GNU bash, version 5.2.15(1)-release`.
@@ -56,11 +63,11 @@ Cryptarch's interactive window. The examples above use stream displays.
 # See help.
 cryptarch -h
 
-# Execute `whoami` once, printing results to the console.
+# Execute `whoami` once, printing results to the console and waiting for a user to `^C`.
 cryptarch -q 'whoami'
 
-# Execute `uptime` continuously, printing results to the console.
-cryptarch -q 'uptime' -t -1
+# Execute `uptime` continuously, printing results to the console, without using persistence.
+cryptarch -q 'uptime' -t -1 -e=false
 
 # Get the size of an NVME used space and output it to a table.
 cryptarch -q 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\''' -r 3 -v "NVME Used Space" -t -1

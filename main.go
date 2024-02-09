@@ -1,10 +1,13 @@
+//
+// Entrypoint for cryptarch execution.
+
 package main
 
 import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -49,6 +52,7 @@ var (
 	delay       int        // Delay between queries.
 	displayMode int        // Result mode to display.
 	filters     string     // Result filters.
+	history     bool       // Whether or not to preserve or use historical results.
 	logLevel    string     // Log level.
 	mode        int        // Mode to execute in.
 	port        string     // Port for RPC.
@@ -66,8 +70,8 @@ var (
 	} // Log levels acceptable as a flag.
 )
 
-// Parses a comma delimited argument string, returning a slice of strings if
-// any are found, or an empty slice if not.
+// Parses a comma delimited argument string, returning a slice of strings if any are found, or an
+// empty slice if not.
 func parseCommaDelimitedArg(arg string) []string {
 	if parsed := strings.Split(arg, ","); parsed[0] == "" {
 		return []string{}
@@ -82,28 +86,24 @@ func main() {
 		pauseQueryChans map[string]chan bool // Channels for pausing queries.
 	)
 
-	defer close(doneQueriesChan)
-	for _, pauseChan := range pauseQueryChans {
-		defer close(pauseChan)
-	}
-
 	// Define arguments.
+	flag.BoolVar(&history, "e", true, "Whether or not to use or preserve history.")
 	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
 	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
 	flag.IntVar(&displayMode, "r", int(lib.DISPLAY_MODE_RAW), "Result mode to display.")
 	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
 	flag.StringVar(&filters, "f", "", "Results filters.")
+	flag.StringVar(&labels, "v", "", "Labels to apply to query values, separated by commas.")
 	flag.StringVar(&logLevel, "l", "error", "Log level.")
 	flag.StringVar(&port, "p", "12345", "Port for RPC.")
-	flag.StringVar(&labels, "v", "", "Labels to apply to query values, separated by commas.")
 	flag.Var(&queries, "q", "Query to execute. When in query mode, this is expected to be some command. When in profile mode it is expected to be PID.")
 	flag.Parse()
 
 	// Set-up logging.
 	if silent || displayMode == int(lib.DISPLAY_MODE_GRAPH) {
 		// Silence all output.
-		logger.SetOutput(ioutil.Discard)
+		logger.SetOutput(io.Discard)
 	} else {
 		// Set the default to be standard error--result modes may change this.
 		slog.SetDefault(slog.New(slog.NewTextHandler(
@@ -119,10 +119,11 @@ func main() {
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_PROFILE,
-			queries,
 			attempts,
 			delay,
+			queries,
 			port,
+			history,
 		)
 
 		// Process mode has specific labels--ignore user provided ones.
@@ -132,10 +133,11 @@ func main() {
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_COMMAND,
-			queries,
 			attempts,
 			delay,
+			queries,
 			port,
+			history,
 		)
 
 		// Rely on user-defined labels.
@@ -160,6 +162,7 @@ func main() {
 			ctx,
 			lib.DisplayMode(displayMode),
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
+			history,
 			lib.Config{
 				LogLevel: logLevel,
 			},
@@ -167,5 +170,9 @@ func main() {
 		)
 	}
 
+	// XXX This isn't strictly necessary, mainly because getting here shouldn't be possible
+	// (`lib.Results` does not have any intentional return condition), but it's being left here in
+	// case in the future we do want to control for query completion.
 	<-doneQueriesChan
+	close(doneQueriesChan)
 }

@@ -22,8 +22,9 @@ const (
 func runQuery(
 	query string,
 	attempts, delay int,
+	history bool,
 	doneChan, pauseChan chan bool,
-	queryFunc func(string),
+	queryFunc func(string, bool),
 ) {
 	// This loop executes as long as attempts has not been reached, or
 	// indefinitely if attempts is less than zero.
@@ -34,7 +35,7 @@ func runQuery(
 			// message from the pause channel.
 			<-pauseChan
 		default:
-			queryFunc(query)
+			queryFunc(query, history)
 
 			// This is not the last execution--add a delay.
 			if i != attempts {
@@ -47,16 +48,16 @@ func runQuery(
 }
 
 // Executes a query as a process to profile.
-func runQueryProfile(pid string) {
+func runQueryProfile(pid string, history bool) {
 	slog.Debug(fmt.Sprintf("Executing profile for PID: '%s' ...", pid))
 
 	pidInt, err := strconv.Atoi(pid)
 	e(err)
-	AddResult(pid, runProfile(pidInt))
+	AddResult(pid, runProfile(pidInt), history)
 }
 
 // Executes a query as a command to exec.
-func runQueryExec(query string) {
+func runQueryExec(query string, history bool) {
 	slog.Debug(fmt.Sprintf("Executing query: '%s' ...", query))
 
 	// Prepare query execution.
@@ -82,7 +83,7 @@ func runQueryExec(query string) {
 	// Interpret results.
 	cmd_output, cmd_output_err := io.ReadAll(stdout)
 	e(cmd_output_err)
-	AddResult(query, string(cmd_output))
+	AddResult(query, string(cmd_output), history)
 	slog.Debug(fmt.Sprintf("Query '%s' result is: %s", query, cmd_output))
 
 	// Clean-up.
@@ -91,11 +92,10 @@ func runQueryExec(query string) {
 
 // Entrypoint for 'query' mode.
 func Query(
-	queryMode int,
+	queryMode, attempts, delay int,
 	queries []string,
-	attempts int,
-	delay int,
 	port string,
+	history bool,
 ) (chan bool, map[string]chan bool) {
 	var (
 		doneQueriesChan = make(chan bool)                          // Signals overall completion.
@@ -114,10 +114,26 @@ func Query(
 		switch queryMode {
 		case QUERY_MODE_COMMAND:
 			slog.Debug("Executing in query mode command.")
-			go runQuery(query, attempts, delay, doneQueryChan, pauseQueryChans[query], runQueryExec)
+			go runQuery(
+				query,
+				attempts,
+				delay,
+				history,
+				doneQueryChan,
+				pauseQueryChans[query],
+				runQueryExec,
+			)
 		case QUERY_MODE_PROFILE:
 			slog.Debug("Executing in query mode profile.")
-			go runQuery(query, attempts, delay, doneQueryChan, pauseQueryChans[query], runQueryProfile)
+			go runQuery(
+				query,
+				attempts,
+				delay,
+				history,
+				doneQueryChan,
+				pauseQueryChans[query],
+				runQueryProfile,
+			)
 		}
 	}
 

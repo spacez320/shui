@@ -57,9 +57,8 @@ var (
 	interruptChan = make(chan bool) // Channel for interrupting displays.
 )
 
-// Starts the display. Applies contextual logic depending on the provided
-// display driver. Expects a function to execute within a goroutine to update
-// the display.
+// Starts the display. Applies contextual logic depending on the provided display driver. Expects a
+// function to execute within a goroutine to update the display.
 func display(driver DisplayDriver, displayUpdateFunc func()) {
 	// Execute the update function.
 	go displayUpdateFunc()
@@ -85,21 +84,41 @@ func helpText() string {
 	return HELP_TEXT + fmt.Sprintf(
 		"\nQuery: %v | Labels: %v | Filters: %v",
 		currentCtx.Value("query"),
-		currentCtx.Value("labels"),
+		store.GetLabels(currentCtx.Value("query").(string)),
 		currentCtx.Value("filters"))
 }
 
 // Presents raw output.
 func RawDisplay(query string) {
-	go func() {
-		for {
-			fmt.Println(GetResult(query))
-		}
-	}()
+	var (
+		reader = readerIndexes[query] // Reader index for the query.
+	)
+
+	// Wait for the first result to appear to synchronize storage.
+	GetResultWait(query)
+	reader.Dec()
+
+	// Load existing results.
+	for _, result := range store.GetToIndex(query, reader) {
+		fmt.Println(result)
+	}
+
+	// Load new results.
+	for {
+		fmt.Println(GetResult(query))
+	}
 }
 
 // Update the results pane with new results as they are generated.
 func StreamDisplay(query string) {
+	var (
+		reader = readerIndexes[query] // Reader index for the query.
+	)
+
+	// Wait for the first result to appear to synchronize storage.
+	GetResultWait(query)
+	reader.Dec()
+
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewText(helpText())
 
@@ -107,22 +126,19 @@ func StreamDisplay(query string) {
 	display(
 		DISPLAY_TVIEW,
 		func() {
-			// Print labels as the first line, if they are present.
-			if labels := store.GetLabels(query); len(labels) > 0 {
-				appTview.QueueUpdateDraw(func() {
-					fmt.Fprintln(resultsView, labels)
-				})
-			}
+			// Print labels as the first line.
+			appTview.QueueUpdateDraw(func() {
+				fmt.Fprintln(resultsView, store.GetLabels(query))
+			})
 
 			// Print all previous results.
-			for _, result := range store.GetToIndex(query, readerIndexes[query]) {
+			for _, result := range store.GetToIndex(query, reader) {
 				fmt.Fprintln(resultsView, result.Value)
 			}
 
 			// Print results.
 			for {
-				// Listen for an interrupt event to stop result consumption in
-				// preparation for some display change.
+				// Listen for an interrupt to stop result consumption for some display change.
 				select {
 				case <-interruptChan:
 					// We've received an interrupt.
@@ -142,9 +158,14 @@ func StreamDisplay(query string) {
 // Creates a table of results for the results pane.
 func TableDisplay(query string, filters []string) {
 	var (
+		reader           = readerIndexes[query]               // Reader index for the query.
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
 	)
+
+	// Wait for the first result to appear to synchronize storage.
+	GetResultWait(query)
+	reader.Dec()
 
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewTable(helpText())
@@ -158,29 +179,26 @@ func TableDisplay(query string, filters []string) {
 				i               = 0    // Used to determine the next row index.
 			)
 
-			// Determine the value indexes to populate into the graph. If no filter is
-			// provided, the index is assumed to be zero.
+			// Determine the value indexes to populate into the graph. If no filter is provided, the index
+			// is assumed to be zero.
 			if len(filters) > 0 {
 				for _, filter := range filters {
 					valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
 				}
 			}
 
-			// Create the table header.
-			if labels := store.GetLabels(query); len(labels) > 0 {
-				appTview.QueueUpdateDraw(func() {
-					// Row to contain the labels.
-					headerRow := resultsView.InsertRow(i)
+			appTview.QueueUpdateDraw(func() {
+				// Row to contain the labels.
+				headerRow := resultsView.InsertRow(i)
 
-					for j, label := range FilterSlice(labels, valueIndexes) {
-						headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
-					}
-				})
-				i += 1
-			}
+				for j, label := range FilterSlice(store.GetLabels(query), valueIndexes) {
+					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
+				}
+			})
+			i += 1
 
 			// Print all previous results.
-			for _, result := range store.GetToIndex(query, readerIndexes[query]) {
+			for _, result := range store.GetToIndex(query, reader) {
 				appTview.QueueUpdateDraw(func() {
 					var (
 						row = resultsView.InsertRow(i) // Row to contain the result.
@@ -204,8 +222,7 @@ func TableDisplay(query string, filters []string) {
 
 			// Print results.
 			for {
-				// Listen for an interrupt event to stop result consumption in
-				// preparation for some display change.
+				// Listen for an interrupt to stop result consumption for some display change.
 				select {
 				case <-interruptChan:
 					// We've received an interrupt.
@@ -243,11 +260,15 @@ func TableDisplay(query string, filters []string) {
 // Creates a graph of results for the results pane.
 func GraphDisplay(query string, filters []string) {
 	var (
-		valueIndex = 0 // Index of the result value to graph.
+		reader     = readerIndexes[query] // Reader index for the query.
+		valueIndex = 0                    // Index of the result value to graph.
 	)
 
-	// Determine the values to populate into the graph. If no filter is provided,
-	// the first value is taken.
+	// Wait for the first result to appear to synchronize storage.
+	GetResultWait(query)
+	reader.Dec()
+
+	// Determine the values to populate into the graph. If none is provided, the first value is taken.
 	if len(filters) > 0 {
 		valueIndex = store.GetValueIndex(query, filters[0])
 	}
@@ -278,7 +299,7 @@ func GraphDisplay(query string, filters []string) {
 		DISPLAY_TERMDASH,
 		func() {
 			// Print all previous results.
-			for _, result := range store.GetToIndex(query, readerIndexes[query]) {
+			for _, result := range store.GetToIndex(query, reader) {
 				// We can display the next result.
 				value := result.Values[valueIndex]
 
@@ -291,8 +312,7 @@ func GraphDisplay(query string, filters []string) {
 			}
 
 			for {
-				// Listen for an interrupt event to stop result consumption in
-				// preparation for some display change.
+				// Listen for an interrupt to stop result consumption for some display change.
 				select {
 				case <-interruptChan:
 					// We've received an interrupt.
@@ -315,7 +335,7 @@ func GraphDisplay(query string, filters []string) {
 		},
 	)
 
-	// Initialize the display. This must happen after the display function is
-	// invoked, otherwise data will never appear.
+	// Initialize the display. This must happen after the display function is invoked, otherwise data
+	// will never appear.
 	initDisplayTermdash(resultWidget, helpWidget, &logsWidgetWriter.text)
 }
