@@ -84,7 +84,7 @@ func helpText() string {
 	return HELP_TEXT + fmt.Sprintf(
 		"\nQuery: %v | Labels: %v | Filters: %v",
 		currentCtx.Value("query"),
-		currentCtx.Value("labels"),
+		store.GetLabels(currentCtx.Value("query").(string)),
 		currentCtx.Value("filters"))
 }
 
@@ -115,12 +115,12 @@ func StreamDisplay(query string) {
 		reader = readerIndexes[query] // Reader index for the query.
 	)
 
-	// Initialize the display.
-	resultsView, _, _ := initDisplayTviewText(helpText())
-
 	// Wait for the first result to appear to synchronize storage.
 	GetResultWait(query)
 	reader.Dec()
+
+	// Initialize the display.
+	resultsView, _, _ := initDisplayTviewText(helpText())
 
 	// Start the display.
 	display(
@@ -163,12 +163,12 @@ func TableDisplay(query string, filters []string) {
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
 	)
 
-	// Initialize the display.
-	resultsView, _, _ := initDisplayTviewTable(helpText())
-
 	// Wait for the first result to appear to synchronize storage.
 	GetResultWait(query)
 	reader.Dec()
+
+	// Initialize the display.
+	resultsView, _, _ := initDisplayTviewTable(helpText())
 
 	// Start the display.
 	display(
@@ -263,6 +263,10 @@ func GraphDisplay(query string, filters []string) {
 		reader     = readerIndexes[query] // Reader index for the query.
 		valueIndex = 0                    // Index of the result value to graph.
 	)
+
+	// Wait for the first result to appear to synchronize storage.
+	GetResultWait(query)
+	reader.Dec()
 
 	// Determine the values to populate into the graph. If none is provided, the first value is taken.
 	if len(filters) > 0 {
