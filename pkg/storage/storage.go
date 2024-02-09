@@ -31,6 +31,7 @@ import (
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Reader indexes control where a consumer has last read a result.
 type ReaderIndex int
 
 // Collection of results mapped to their queries.
@@ -43,16 +44,16 @@ type Storage map[string]*Results
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const (
-	// Size of Put channels. This is the amount of results that may accumulate if not being actively
-	// consumed.
-	PUT_EVENT_CHANNEL_SIZE = 128
+	PUT_EVENT_CHANNEL_SIZE = 128            // Size of put channels, controlling the amount of waiting results.
+	STORAGE_FILE_DIR       = "cryptarch"    // Directory in user cache to use for storage.
+	STORAGE_FILE_NAME      = "storage.json" // Filename to use for actual storage.
 )
 
 var (
-	storageF     *os.File   // File for storage writes.
-	storageMutex sync.Mutex // Lock for storage file writes.
+	storageFile  *os.File    // File for storage writes.
+	storageMutex *sync.Mutex // Lock for storage file writes.
 
-	PutEvents = make(map[string](chan Result)) // Channels for broadcasting Put calls.
+	PutEvents = make(map[string](chan Result)) // Channels for broadcasting put calls.
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,10 +68,19 @@ func (i *ReaderIndex) inc() {
 }
 
 // initializes a new results series in storage. Must be called when a new results series is created.
-func (s *Storage) newResults(query string) {
+// This function is idempotent in that it will check if results for a query have already been
+// initialized and pass silently if so.
+func (s *Storage) newResults(query string, size int) {
+	var (
+		results Results // Results to add.
+	)
+
 	if _, ok := (*s)[query]; !ok {
-		// This is a new query, initialize an empty results.
-		(*s)[query] = &Results{}
+		// Initialize results.
+		results = newResults(size)
+		(*s)[query] = &results
+
+		// Initialize the query's put event channel.
 		PutEvents[query] = make(chan Result, PUT_EVENT_CHANNEL_SIZE)
 	}
 }
@@ -89,7 +99,7 @@ func (s *Storage) save() error {
 
 	// Translate current storage into binary json and save it.
 	storageJson, err = json.MarshalIndent(&s, "", "\t")
-	_, err = storageF.WriteAt(storageJson, 0)
+	_, err = storageFile.WriteAt(storageJson, 0)
 
 	return err
 }
@@ -126,15 +136,15 @@ func NewStorage(persistence bool) (storage Storage, err error) {
 	}
 
 	// Create the user cache directory for data.
-	cryptarchUserCacheDir = filepath.Join(userCacheDir, "cryptarch")
+	cryptarchUserCacheDir = filepath.Join(userCacheDir, STORAGE_FILE_DIR)
 	err = os.MkdirAll(cryptarchUserCacheDir, fs.FileMode(0770))
 	if err != nil {
 		return
 	}
 
 	// Instantiate the storage file.
-	storageFP = filepath.Join(cryptarchUserCacheDir, "storage.json")
-	storageF, err = os.OpenFile(
+	storageFP = filepath.Join(cryptarchUserCacheDir, STORAGE_FILE_NAME)
+	storageFile, err = os.OpenFile(
 		storageFP,
 		os.O_CREATE|os.O_RDWR,
 		fs.FileMode(0770),
@@ -151,13 +161,14 @@ func NewStorage(persistence bool) (storage Storage, err error) {
 
 		// Read in storage data and supply it to storage. We must initialize any results series before
 		// populating data.
-		storageData, err = io.ReadAll(storageF)
+		storageData, err = io.ReadAll(storageFile)
 		if err != nil {
 			return
 		}
 		json.Unmarshal(storageData, &storagePre)
 		for query := range storagePre {
-			storage.newResults(query)
+			// TODO Results loading should also preserve and restore actual labels.
+			storage.newResults(query, len(storagePre[query].Results[0].Values))
 		}
 		storage = storagePre
 	}
@@ -165,9 +176,14 @@ func NewStorage(persistence bool) (storage Storage, err error) {
 	return
 }
 
+// Sets a redaer index to a specified value.
+func (i *ReaderIndex) Set(newI int) {
+	*i = ReaderIndex(newI)
+}
+
 // Closes a storage. Should be called after all storage operations cease.
 func (s *Storage) Close() {
-	storageF.Close()
+	storageFile.Close()
 }
 
 // Get a result based on a timestamp.
@@ -175,6 +191,7 @@ func (s *Storage) Get(query string, time time.Time) Result {
 	return (*s)[query].get(time)
 }
 
+// Get all results.
 func (s *Storage) GetAll(query string) []Result {
 	return (*s)[query].Results
 }
@@ -189,6 +206,7 @@ func (s *Storage) GetRange(query string, startTime, endTime time.Time) []Result 
 	return (*s)[query].getRange(startTime, endTime)
 }
 
+// Given results up to a reader index (a.k.a. "playback").
 func (s *Storage) GetToIndex(query string, index *ReaderIndex) []Result {
 	return (*s)[query].Results[:*index]
 }
@@ -216,7 +234,7 @@ func (s *Storage) NewReaderIndex(query string) *ReaderIndex {
 	return &r
 }
 
-// Retrieve the next result from a put event channel.
+// Retrieve the next result from a put event channel, blocking if none exists.
 func (s *Storage) Next(query string, index *ReaderIndex) (next Result) {
 	next = <-PutEvents[query]
 	index.inc()
@@ -228,6 +246,7 @@ func (s *Storage) Next(query string, index *ReaderIndex) (next Result) {
 func (s *Storage) NextOrEmpty(query string, index *ReaderIndex) (next Result) {
 	select {
 	case next = <-PutEvents[query]:
+		// Only increment the read counter if something consumed the event.
 		index.inc()
 	default:
 	}
@@ -235,13 +254,14 @@ func (s *Storage) NextOrEmpty(query string, index *ReaderIndex) (next Result) {
 	return
 }
 
-// Put a new compound result.
+// Put a new result.
 func (s *Storage) Put(
 	query, value string,
 	persistence bool,
 	values ...interface{},
 ) (result Result, err error) {
-	s.newResults(query)
+	// Initialize the result.
+	s.newResults(query, len(values))
 	result = (*s)[query].put(value, values...)
 
 	// Send a non-blocking put event. Put events are lossy and clients may lose information if not
@@ -259,9 +279,9 @@ func (s *Storage) Put(
 	return
 }
 
-// Assigns labels to a results series.
+// Assigns explicit labels to a results series.
 func (s *Storage) PutLabels(query string, labels []string) {
-	s.newResults(query)
+	s.newResults(query, len(labels))
 	(*s)[query].Labels = labels
 }
 

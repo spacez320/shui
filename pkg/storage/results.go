@@ -6,6 +6,7 @@ package storage
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -20,8 +21,11 @@ type Result struct {
 
 // Collection of results.
 type Results struct {
-	Labels  []string // Meta field for result values acting as a name, corresponding by index.
-	Results []Result // Stored results.
+	// Meta field for result values acting as a name, corresponding by index. In the event that no
+	// explicit labels are defined, the indexes are the labels.
+	Labels []string
+	// Stored results.
+	Results []Result
 }
 
 // Get a result based on a timestamp.
@@ -83,4 +87,15 @@ func (r *Results) show() {
 // Determines whether this is an empty result.
 func (r *Result) IsEmpty() bool {
 	return reflect.DeepEqual(*r, Result{})
+}
+
+// Creates new results.
+func newResults(size int) (results Results) {
+	// Iniitialize labels.
+	results.Labels = make([]string, size)
+	for i := range results.Labels {
+		results.Labels[i] = strconv.Itoa(i)
+	}
+
+	return
 }

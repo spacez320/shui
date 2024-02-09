@@ -90,8 +90,12 @@ func helpText() string {
 
 // Presents raw output.
 func RawDisplay(query string) {
+	var (
+		reader = readerIndexes[query] // Reader index for the query.
+	)
+
 	// Load existing results.
-	for _, result := range store.GetToIndex(query, readerIndexes[query]) {
+	for _, result := range store.GetToIndex(query, reader) {
 		fmt.Println(result)
 	}
 
@@ -103,22 +107,29 @@ func RawDisplay(query string) {
 
 // Update the results pane with new results as they are generated.
 func StreamDisplay(query string) {
+	var (
+		reader = readerIndexes[query] // Reader index for the query.
+	)
+
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewText(helpText())
+
+	// Wait for the first result to appear to extrapolate display information about it. Afterwards,
+	// rewind the reader index.
+	GetResultWait(query)
+	reader.Set(0)
 
 	// Start the display.
 	display(
 		DISPLAY_TVIEW,
 		func() {
-			// Print labels as the first line, if they are present.
-			if labels := store.GetLabels(query); len(labels) > 0 {
-				appTview.QueueUpdateDraw(func() {
-					fmt.Fprintln(resultsView, labels)
-				})
-			}
+			// Print labels as the first line.
+			appTview.QueueUpdateDraw(func() {
+				fmt.Fprintln(resultsView, store.GetLabels(query))
+			})
 
 			// Print all previous results.
-			for _, result := range store.GetToIndex(query, readerIndexes[query]) {
+			for _, result := range store.GetToIndex(query, reader) {
 				fmt.Fprintln(resultsView, result.Value)
 			}
 
@@ -144,12 +155,17 @@ func StreamDisplay(query string) {
 // Creates a table of results for the results pane.
 func TableDisplay(query string, filters []string) {
 	var (
+		reader           = readerIndexes[query]               // Reader index for the query.
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
 	)
 
 	// Initialize the display.
 	resultsView, _, _ := initDisplayTviewTable(helpText())
+
+	// Wait for the first result to appear to extrapolate display information about it.
+	GetResultWait(query)
+	reader.Set(0)
 
 	// Start the display.
 	display(
@@ -168,21 +184,18 @@ func TableDisplay(query string, filters []string) {
 				}
 			}
 
-			// Create the table header.
-			if labels := store.GetLabels(query); len(labels) > 0 {
-				appTview.QueueUpdateDraw(func() {
-					// Row to contain the labels.
-					headerRow := resultsView.InsertRow(i)
+			appTview.QueueUpdateDraw(func() {
+				// Row to contain the labels.
+				headerRow := resultsView.InsertRow(i)
 
-					for j, label := range FilterSlice(labels, valueIndexes) {
-						headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
-					}
-				})
-				i += 1
-			}
+				for j, label := range FilterSlice(store.GetLabels(query), valueIndexes) {
+					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
+				}
+			})
+			i += 1
 
 			// Print all previous results.
-			for _, result := range store.GetToIndex(query, readerIndexes[query]) {
+			for _, result := range store.GetToIndex(query, reader) {
 				appTview.QueueUpdateDraw(func() {
 					var (
 						row = resultsView.InsertRow(i) // Row to contain the result.
@@ -244,7 +257,8 @@ func TableDisplay(query string, filters []string) {
 // Creates a graph of results for the results pane.
 func GraphDisplay(query string, filters []string) {
 	var (
-		valueIndex = 0 // Index of the result value to graph.
+		reader     = readerIndexes[query] // Reader index for the query.
+		valueIndex = 0                    // Index of the result value to graph.
 	)
 
 	// Determine the values to populate into the graph. If none is provided, the first value is taken.
@@ -278,7 +292,7 @@ func GraphDisplay(query string, filters []string) {
 		DISPLAY_TERMDASH,
 		func() {
 			// Print all previous results.
-			for _, result := range store.GetToIndex(query, readerIndexes[query]) {
+			for _, result := range store.GetToIndex(query, reader) {
 				// We can display the next result.
 				value := result.Values[valueIndex]
 

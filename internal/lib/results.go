@@ -166,7 +166,7 @@ func Results(
 		defer close(pauseQueryChan)
 	}
 
-	// Iniitialize reader indexes.
+	// Initialize reader indexes.
 	readerIndexes = make(map[string]*storage.ReaderIndex, len(queries))
 	for _, query := range queries {
 		readerIndexes[query] = store.NewReaderIndex(query)
@@ -177,8 +177,10 @@ func Results(
 		currentCtx = ctx
 		resetContext(query)
 
-		// Set up labelling or any schema for the results store.
-		store.PutLabels(query, labels)
+		// Set up labelling or any schema for the results store, if any were explicitly provided.
+		if len(labels) > 0 {
+			store.PutLabels(query, labels)
+		}
 
 		switch displayMode {
 		case DISPLAY_MODE_RAW:
