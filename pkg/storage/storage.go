@@ -213,7 +213,7 @@ func (s *Storage) GetRange(query string, startTime, endTime time.Time) []Result 
 
 // Given results up to a reader index (a.k.a. "playback").
 func (s *Storage) GetToIndex(query string, index *ReaderIndex) []Result {
-	return (*s)[query].Results[:*index]
+	return (*s)[query].Results[:(*index)+1]
 }
 
 // Given a filter, return the corresponding value index.

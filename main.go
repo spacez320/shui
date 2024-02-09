@@ -83,11 +83,6 @@ func main() {
 		pauseQueryChans map[string]chan bool // Channels for pausing queries.
 	)
 
-	defer close(doneQueriesChan)
-	for _, pauseChan := range pauseQueryChans {
-		defer close(pauseChan)
-	}
-
 	// Define arguments.
 	flag.BoolVar(&history, "e", true, "Whether or not to use or preserve history.")
 	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
@@ -171,6 +166,8 @@ func main() {
 			pauseQueryChans,
 		)
 	}
+
+	defer close(doneQueriesChan)
 
 	<-doneQueriesChan
 }
