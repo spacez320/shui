@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	_ "golang.org/x/exp/slog"
 )
 
@@ -34,11 +33,10 @@ const (
 
 // Collection of results mapped to their queries.
 type Storage struct {
-	externalStorages []externalStorage                   // Integrated external storages.
-	putEventChans    map[string](chan Result)            // Map of queries to put even channels.
-	readerIndexes    map[ReaderIndexClientId]ReaderIndex // Mape of reader index to clientId.
-	storageFile      *os.File                            // File for persisting results.
-	storageMutex     *sync.Mutex                         // Mutex for managing persistence writes.
+	externalStorages []externalStorage        // Integrated external storages.
+	putEventChans    map[string](chan Result) // Map of queries to put even channels.
+	storageFile      *os.File                 // File for persisting results.
+	storageMutex     *sync.Mutex              // Mutex for managing persistence writes.
 
 	Results map[string]*Results // Map of queries to results.
 }
@@ -183,14 +181,10 @@ func (s *Storage) GetValueIndex(query, filter string) int {
 
 // Initialize a new reader index. Will attempt to set the initial value to the end of existing
 // results, if results already exist.
-func (s *Storage) NewReaderIndex(query string) (clientId ReaderIndexClientId) {
+func (s *Storage) NewReaderIndex(query string) *ReaderIndex {
 	var (
-		id     uuid.UUID   // UUID to use for the client.
-		reader ReaderIndex // Reader index to initiate.
+		reader ReaderIndex // Reader index to initialize.
 	)
-
-	id, _ = uuid.NewRandom()
-	clientId = ReaderIndexClientId(id)
 
 	if _, ok := (*s).Results[query]; !ok {
 		// There is no data.
@@ -200,18 +194,11 @@ func (s *Storage) NewReaderIndex(query string) (clientId ReaderIndexClientId) {
 		reader = ReaderIndex(len((*s).Results[query].Results))
 	}
 
-	// Assign the reader index internally.
-	(*s).readerIndexes[clientId] = reader
-
-	return
+	return &reader
 }
 
 // Retrieve the next result from a put event channel, blocking if none exists.
-func (s *Storage) Next(query string, clientId ReaderIndexClientId) (next Result) {
-	var (
-		reader = (*s).readerIndexes[clientId]
-	)
-
+func (s *Storage) Next(query string, reader *ReaderIndex) (next Result) {
 	next = <-(*s).putEventChans[query]
 	reader.Inc()
 
@@ -219,11 +206,7 @@ func (s *Storage) Next(query string, clientId ReaderIndexClientId) (next Result)
 }
 
 // Retrieve the next result from a put event channel, returning an empty result if nothing exists.
-func (s *Storage) NextOrEmpty(query string, clientId ReaderIndexClientId) (next Result) {
-	var (
-		reader = (*s).readerIndexes[clientId]
-	)
-
+func (s *Storage) NextOrEmpty(query string, reader *ReaderIndex) (next Result) {
 	select {
 	case next = <-(*s).putEventChans[query]:
 		// Only increment the read counter if something consumed the event.

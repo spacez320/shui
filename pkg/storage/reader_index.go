@@ -1,15 +1,11 @@
 //
-// Reader indexes allow for tracking the last read result from a results series.
+// Reader indexes allow for tracking the last read result from a results series. Reader indexes are
+// meant to be supplied and managed by clients.
 
 package storage
 
-import "github.com/google/uuid"
-
 // Reader indexes control where a consumer has last read a result.
 type ReaderIndex int
-
-// Client id for reader indexes.
-type ReaderIndexClientId uuid.UUID
 
 // Decrement a reader index, to re-read the last read.
 func (i *ReaderIndex) Dec() {
