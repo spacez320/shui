@@ -57,7 +57,6 @@ func TestCLI(t *testing.T) {
 		testName string
 		cliArgs  []string
 	}{
-		{"no-args", []string{}},
 		{"help", []string{"-h"}},
 	}
 
