@@ -30,7 +30,7 @@ var (
 	currentCtx      context.Context                 // Current context.
 	driver          DisplayDriver                   // Display driver, dictated by the results.
 	pauseQueryChans map[string]chan bool            // Channels for dealing with 'pause' events for results.
-	readerIndexes   map[string]*storage.ReaderIndex // Reader indexes for queries.
+	readerIndexes   map[string]*storage.ReaderIndex // Collection of reader index ids per query.
 	store           storage.Storage                 // Stored results.
 
 	ctxDefaults = map[string]interface{}{

@@ -26,6 +26,8 @@ import (
 )
 
 const (
+	MAX_EXTERNAL_STORAGES  = 128            // Maximum external storage integrations.
+	MAX_RESULTS            = 128            // Maximum number of result series that may be maintained.
 	PUT_EVENT_CHANNEL_SIZE = 128            // Size of put channels, controlling the amount of waiting results.
 	STORAGE_FILE_DIR       = "cryptarch"    // Directory in user cache to use for storage.
 	STORAGE_FILE_NAME      = "storage.json" // Filename to use for actual storage.
@@ -64,16 +66,16 @@ func (s *Storage) newResults(query string, size int) {
 func (s *Storage) save() error {
 	var (
 		err         error  // General error holder.
-		storageJson []byte // Bytes as json.
+		resultsJson []byte // Bytes as json.
 	)
 
 	// Lock storage to prevent dirty writes.
 	(*s).storageMutex.Lock()
 	defer (*s).storageMutex.Unlock()
 
-	// Translate current storage into binary json and save it.
-	storageJson, err = json.MarshalIndent(&s, "", "\t")
-	_, err = (*s).storageFile.WriteAt(storageJson, 0)
+	// Translate current storage results into binary json and save it.
+	resultsJson, err = json.MarshalIndent(&s.Results, "", "\t")
+	_, err = (*s).storageFile.WriteAt(resultsJson, 0)
 
 	return err
 }
@@ -90,7 +92,11 @@ func NewStorage(persistence bool) (storage Storage, err error) {
 	)
 
 	// Initialize storage.
-	storage = Storage{}
+	storage = Storage{
+		Results:       make(map[string]*Results, MAX_RESULTS),
+		putEventChans: make(map[string](chan Result), MAX_RESULTS),
+		storageMutex:  &sync.Mutex{},
+	}
 
 	// If we have disabled persistence, simply return the new storage instance.
 	if !persistence {
@@ -134,11 +140,12 @@ func NewStorage(persistence bool) (storage Storage, err error) {
 			return
 		}
 		json.Unmarshal(storageData, &results)
+
 		for query := range results {
 			// TODO Results loading should also preserve and restore actual labels.
 			storage.newResults(query, len(results[query].Results[0].Values))
+			storage.Results[query] = results[query]
 		}
-		storage.Results = results
 	}
 
 	return
