@@ -33,6 +33,12 @@ func environToA(environ map[string]string) (a string) {
 	return strings.TrimSuffix(a, ",")
 }
 
+// Builds the Cryptarch binary.
+func buildCryptarch() ([]byte, error) {
+	cmd := exec.Command("go", "build", "-o", cryptarch)
+	return cmd.CombinedOutput()
+}
+
 // Executes the Cryptarch binary.
 func runCryptarch(args []string) ([]byte, error) {
 	var (
@@ -46,6 +52,7 @@ func runCryptarch(args []string) ([]byte, error) {
 
 // Test set-up.
 func TestMain(m *testing.M) {
+	buildCryptarch()
 	os.Exit(m.Run())
 }
 
