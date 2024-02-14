@@ -24,23 +24,22 @@ var (
 )
 
 // Converts a string-to-string mapping to a comma-delimited string.
-func environToA(environ map[string]string, delimiter string) (a string) {
+func environToA(environ map[string]string) (a string) {
 	for k, v := range environ {
-		a += fmt.Sprintf("%s=\"%s\"%s", k, v, delimiter)
+		a += fmt.Sprintf("%s=\"%s\"%s", k, v, ",")
 	}
 
 	// Take the last delimiter off.
-	return strings.TrimSuffix(a, delimiter)
+	return strings.TrimSuffix(a, ",")
 }
 
 // Executes the Cryptarch binary.
 func runCryptarch(args []string) ([]byte, error) {
 	var (
-		environ = append(os.Environ(), environToA(testEnviron, ","))
+		environ = append(os.Environ(), environToA(testEnviron))
 	)
 
 	cmd := exec.Command(cryptarch, args...)
-	fmt.Printf("Executing: %v ... \n", cmd)
 	cmd.Env = environ
 	return cmd.CombinedOutput()
 }
