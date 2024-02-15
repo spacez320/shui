@@ -250,7 +250,6 @@ func (s *Storage) Put(
 	if persistence {
 		err = s.save()
 	}
-
 	if err != nil {
 		return
 	}
@@ -258,7 +257,6 @@ func (s *Storage) Put(
 	// Persist data to external sources.
 	for _, externalStore := range (*s).externalStorages {
 		err = externalStore.Put(query, (*s).Results[query].Labels, result)
-
 		if err != nil {
 			return
 		}
