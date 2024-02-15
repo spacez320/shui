@@ -96,14 +96,12 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 	return
 }
 
-// Sets-up the tview flex box, which defines the overall layout. Meant to
-// encapsulate the common things needed regardless of what from the results
-// view takes (assuming it fits into flex box).
+// Sets-up the tview flex box, which defines the overall layout. Meant to encapsulate the common
+// things needed regardless of what from the results view takes (assuming it fits into flex box).
 //
-// Note that the app needs to be run separately from initialization in the
-// coroutine display function. Note also that direct manipulation of the tview
-// Primitives as subclasses (like tview.Box) needs to happen outside this
-// function, as well.
+// Note that the app needs to be run separately from initialization in the coroutine display
+// function. Note also that direct manipulation of the tview Primitives as subclasses (like
+// tview.Box) needs to happen outside this function, as well.
 func initDisplayTview(
 	resultsView tview.Primitive,
 	helpView, logsView *tview.TextView,

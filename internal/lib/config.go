@@ -16,7 +16,8 @@ var (
 
 // Shareable configuration.
 type Config struct {
-	LogLevel string
+	LogLevel        string // Log level.
+	PushgatewayAddr string // Pushgateway address.
 }
 
 // Retrieves an Slog level from a human-readable level string.

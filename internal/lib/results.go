@@ -30,7 +30,7 @@ var (
 	currentCtx      context.Context                 // Current context.
 	driver          DisplayDriver                   // Display driver, dictated by the results.
 	pauseQueryChans map[string]chan bool            // Channels for dealing with 'pause' events for results.
-	readerIndexes   map[string]*storage.ReaderIndex // Reader indexes for queries.
+	readerIndexes   map[string]*storage.ReaderIndex // Collection of reader index ids per query.
 	store           storage.Storage                 // Stored results.
 
 	ctxDefaults = map[string]interface{}{
@@ -147,23 +147,29 @@ func Results(
 	inputPauseQueryChans map[string]chan bool,
 ) {
 	var (
-		err error // General error holder.
+		err         error                      // General error holder.
+		pushgateway storage.PushgatewayStorage // Pushgateway configuraiton.
 
 		filters = ctx.Value("filters").([]string) // Capture filters from context.
 		labels  = ctx.Value("labels").([]string)  // Capture labels from context.
 		queries = ctx.Value("queries").([]string) // Capture queries from context.
 	)
+	// Assign global config and global control channels.
+	config, pauseQueryChans = inputConfig, inputPauseQueryChans
+	defer close(pauseDisplayChan)
+	for _, pauseQueryChan := range pauseQueryChans {
+		defer close(pauseQueryChan)
+	}
 
 	// Initialize storage.
 	store, err = storage.NewStorage(history)
 	e(err)
 	defer store.Close()
 
-	// Assign global config and global control channels.
-	config, pauseQueryChans = inputConfig, inputPauseQueryChans
-	defer close(pauseDisplayChan)
-	for _, pauseQueryChan := range pauseQueryChans {
-		defer close(pauseQueryChan)
+	// Initialize external storage.
+	if config.PushgatewayAddr != "" {
+		pushgateway = storage.NewPushgatewayStorage(config.PushgatewayAddr)
+		store.AddExternalStorage(&pushgateway)
 	}
 
 	// Initialize reader indexes.

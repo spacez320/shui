@@ -14,12 +14,6 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-// Represents the display driver.
-type DisplayDriver int
-
-// Represents the display mode.
-type DisplayMode int
-
 // Display driver constants. Each display mode uses a specific display driver.
 const (
 	DISPLAY_RAW      DisplayDriver = iota + 1 // Used for direct output.
@@ -56,6 +50,12 @@ var (
 	} // Display modes considered for use in the current session.
 	interruptChan = make(chan bool) // Channel for interrupting displays.
 )
+
+// Represents the display driver.
+type DisplayDriver int
+
+// Represents the display mode.
+type DisplayMode int
 
 // Starts the display. Applies contextual logic depending on the provided display driver. Expects a
 // function to execute within a goroutine to update the display.

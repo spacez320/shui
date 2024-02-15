@@ -70,15 +70,14 @@ func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 
 // Error management for termdash.
 func errorTermdashHandler(e error) {
-	// If we hit an error from termdash, just log it and try to continue. Cases
-	// of errors seen so far make sense to ignore:
+	// If we hit an error from termdash, just log it and try to continue. Cases of errors seen so far
+	// make sense to ignore:
 	//
 	// - Unimplemented key-strokes.
 	slog.Error(e.Error())
 }
 
-// Sets-up the termdash container, which defines the overall layout, and begins
-// running the display.
+// Sets-up the termdash container, which defines the overall layout, and begins running the display.
 func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget) {
 	var (
 		ctx context.Context // Termdash specific context.

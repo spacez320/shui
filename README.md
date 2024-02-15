@@ -27,11 +27,11 @@ Cryptarch has **"modes"** that determine what type of query should be provided.
 
 **Query mode** is the default and is for running shell commands.
 
-![Demo of query mode](https://raw.githubusercontent.com/spacez320/cryptarch/master/media/query-mode.gif)
+![Demo of query mode](https://raw.githubusercontent.com/spacez320/cryptarch/master/assets/query-mode.gif)
 
 **Profile mode** is like Query mode except specialized for inspecting systems or processes.
 
-![Demo of profile mode](https://raw.githubusercontent.com/spacez320/cryptarch/master/media/profile-mode.gif)
+![Demo of profile mode](https://raw.githubusercontent.com/spacez320/cryptarch/master/assets/profile-mode.gif)
 
 ### Displays
 
@@ -42,11 +42,11 @@ Cryptarch's interactive window. The examples above use stream displays.
 
 **Table display** will parse results into a table.
 
-![Demo of table display](https://raw.githubusercontent.com/spacez320/cryptarch/master/media/table-display.gif)
+![Demo of table display](https://raw.githubusercontent.com/spacez320/cryptarch/master/assets/table-display.gif)
 
 **Graph display** will target a specific field in a result and graph it.
 
-![Demo of graph display](https://raw.githubusercontent.com/spacez320/cryptarch/master/media/graph-display.gif)
+![Demo of graph display](https://raw.githubusercontent.com/spacez320/cryptarch/master/assets/graph-display.gif)
 
 ### Persistence
 

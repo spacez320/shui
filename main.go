@@ -24,7 +24,8 @@ type queryMode int
 type queriesArg []string
 
 func (q *queriesArg) String() string {
-	return fmt.Sprintf("%v", &q)
+	// XXX This is necessary to resolve the interface contract, but doesn't seem important.
+	return ""
 }
 
 func (q *queriesArg) Set(query string) error {
@@ -48,17 +49,18 @@ const (
 )
 
 var (
-	attempts    int        // Number of attempts to execute the query.
-	delay       int        // Delay between queries.
-	displayMode int        // Result mode to display.
-	filters     string     // Result filters.
-	history     bool       // Whether or not to preserve or use historical results.
-	logLevel    string     // Log level.
-	mode        int        // Mode to execute in.
-	port        string     // Port for RPC.
-	queries     queriesArg // Queries to execute.
-	silent      bool       // Whether or not to be quiet.
-	labels      string     // Result value labels.
+	count           int        // Number of attempts to execute the query.
+	delay           int        // Delay between queries.
+	displayMode     int        // Result mode to display.
+	filters         string     // Result filters.
+	history         bool       // Whether or not to preserve or use historical results.
+	logLevel        string     // Log level.
+	mode            int        // Mode to execute in.
+	port            string     // Port for RPC.
+	pushgatewayAddr string     // Address for Prometheus Pushg
+	queries         queriesArg // Queries to execute.
+	silent          bool       // Whether or not to be quiet.
+	labels          string     // Result value labels.
 
 	ctx                    = context.Background() // Initialize context.
 	logger                 = log.Default()        // Logging system.
@@ -87,17 +89,19 @@ func main() {
 	)
 
 	// Define arguments.
-	flag.BoolVar(&history, "e", true, "Whether or not to use or preserve history.")
-	flag.BoolVar(&silent, "s", false, "Don't output anything to a console.")
-	flag.IntVar(&attempts, "t", 1, "Number of query executions. -1 for continuous.")
-	flag.IntVar(&delay, "d", 3, "Delay between queries (seconds).")
-	flag.IntVar(&displayMode, "r", int(lib.DISPLAY_MODE_RAW), "Result mode to display.")
-	flag.IntVar(&mode, "m", int(MODE_QUERY), "Mode to execute in.")
-	flag.StringVar(&filters, "f", "", "Results filters.")
-	flag.StringVar(&labels, "v", "", "Labels to apply to query values, separated by commas.")
-	flag.StringVar(&logLevel, "l", "error", "Log level.")
-	flag.StringVar(&port, "p", "12345", "Port for RPC.")
-	flag.Var(&queries, "q", "Query to execute. When in query mode, this is expected to be some command. When in profile mode it is expected to be PID.")
+	flag.BoolVar(&history, "history", true, "Whether or not to use or preserve history.")
+	flag.BoolVar(&silent, "silent", false, "Don't output anything to a console.")
+	flag.IntVar(&count, "count", 1, "Number of query executions. -1 for continuous.")
+	flag.IntVar(&delay, "delay", 3, "Delay between queries (seconds).")
+	flag.IntVar(&displayMode, "display", int(lib.DISPLAY_MODE_RAW), "Result mode to display.")
+	flag.IntVar(&mode, "mode", int(MODE_QUERY), "Mode to execute in.")
+	flag.StringVar(&filters, "filters", "", "Results filters.")
+	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
+	flag.StringVar(&logLevel, "logLevel", "error", "Log level.")
+	flag.StringVar(&port, "port", "12345", "Port for RPC.")
+	flag.StringVar(&pushgatewayAddr, "pushgateway", "127.0.0.1:9091", "Address for Prometheus Pushgateway.")
+	flag.Var(&queries, "query", "Query to execute. Can be supplied multiple times. When in query"+
+		"mode, this is expected to be some command. When in profile mode it is expected to be PID.")
 	flag.Parse()
 
 	// Set-up logging.
@@ -119,7 +123,7 @@ func main() {
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_PROFILE,
-			attempts,
+			count,
 			delay,
 			queries,
 			port,
@@ -133,7 +137,7 @@ func main() {
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_COMMAND,
-			attempts,
+			count,
 			delay,
 			queries,
 			port,
@@ -164,7 +168,8 @@ func main() {
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			history,
 			lib.Config{
-				LogLevel: logLevel,
+				LogLevel:        logLevel,
+				PushgatewayAddr: pushgatewayAddr,
 			},
 			pauseQueryChans,
 		)
