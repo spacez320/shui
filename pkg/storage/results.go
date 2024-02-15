@@ -16,7 +16,7 @@ import (
 // Individual result.
 type Result struct {
 	Time   time.Time     // Time the result was created.
-	Value  interface{}   // Raw value of the result.
+	Value  string        // Raw value of the result.
 	Values []interface{} // Tokenized value of the result.
 }
 

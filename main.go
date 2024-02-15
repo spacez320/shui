@@ -168,7 +168,8 @@ func main() {
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			history,
 			lib.Config{
-				LogLevel: logLevel,
+				LogLevel:        logLevel,
+				PushgatewayAddr: pushgatewayAddr,
 			},
 			pauseQueryChans,
 		)

@@ -151,6 +151,11 @@ func NewStorage(persistence bool) (storage Storage, err error) {
 	return
 }
 
+// Adds an external storage.
+func (s *Storage) AddExternalStorage(e externalStorage) {
+	(*s).externalStorages = append((*s).externalStorages, e)
+}
+
 // Closes a storage. Should be called after all storage operations cease.
 func (s *Storage) Close() {
 	(*s).storageFile.Close()
@@ -252,7 +257,7 @@ func (s *Storage) Put(
 
 	// Persist data to external sources.
 	for _, externalStore := range (*s).externalStorages {
-		err = externalStore.Put(result)
+		err = externalStore.Put(query, (*s).Results[query].Labels, result)
 
 		if err != nil {
 			return
