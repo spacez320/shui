@@ -10,7 +10,9 @@ before:
     # - go generate ./...  # Leaving for future use.
 
 builds:
-  - goos:
+  - env:
+      - CGO_ENABLED=0
+    goos:
       - darwin
       - linux
 
@@ -23,10 +25,3 @@ changelog:
 
 # Produce a stock checksum file.
 checksum: {}
-
-dockers:
-  - dockerfile: build/package/Containerfile
-    image_templates:
-      - spacez320/{{ .ProjectName }}:latest
-      - spacez320/{{ .ProjectName }}:{{ .Version }}
-    use: podman
