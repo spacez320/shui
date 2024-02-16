@@ -13,7 +13,8 @@ This project is in an active, "alpha" development phase, but should generally be
 Setup
 -----
 
-Binaries are available from [the releases page](https://github.com/spacez320/cryptarch/releases).
+- Binaries are available from [the releases page](https://github.com/spacez320/cryptarch/releases).
+- Docker images are available on [Docker Hub](https://hub.docker.com/repository/docker/spacez320/cryptarch).
 
 Usage
 -----
@@ -44,16 +45,52 @@ Cryptarch's interactive window. The examples above use stream displays.
 
 ![Demo of table display](https://raw.githubusercontent.com/spacez320/cryptarch/master/assets/table-display.gif)
 
-**Graph display** will target a specific field in a result and graph it.
+**Graph display** will target a specific field in a result and graph it (this requires the query to
+produce a number).
 
 ![Demo of graph display](https://raw.githubusercontent.com/spacez320/cryptarch/master/assets/graph-display.gif)
 
 ### Persistence
 
-Cryptarch, by default, will store results and load them when re-executing the same query. Storage is
-located in the user's cache directory.
+Cryptarch, by default, will store results and load them when re-executing the same query.
+
+The only currently supported storage is local disk, located in the user's cache directory.
 
 See: <https://pkg.go.dev/os#UserCacheDir>
+
+### Integrations
+
+Cryptarch can send its data off to external systems, making it useful as an ad-hoc metrics or log
+exporter. Supported integrations are listed below.
+
+#### Prometheus
+
+Both normal Prometheus collection and Pushgateway are supported.
+
+```sh
+# Start a Prometheus collection HTTP page.
+cryptarch --prometheus <address>
+
+# Specify a Prometheus Pushgateway address to send results to.
+cryptarch --pushgateway <address>
+```
+
+- Metrics name will have the structure `cryptarch_<query>` where `<query>` will be changed to
+  conform to Prometheus naming rules.
+- Cryptarch labels supplied with the `-labels` will be saved as a Prometheus label called
+  `cryptarch_label`.
+
+As an example, given a query `cat file.txt | wc`, and `-labels "newline,words,bytes"`, the following
+Prometheus metrics would be created:
+
+```
+cryptarch_cat_file_txt_wc{cryptarch_label="newline"}
+cryptarch_cat_file_txt_wc{cryptarch_label="words"}
+cryptarch_cat_file_txt_wc{cryptarch_label="bytes"}
+```
+
+> **NOTE:** The only currently supported metric is a **Gauge** and queries must provide something
+> numerical to be recorded.
 
 ### More Examples
 
@@ -64,13 +101,21 @@ See: <https://pkg.go.dev/os#UserCacheDir>
 cryptarch -h
 
 # Execute `whoami` once, printing results to the console and waiting for a user to `^C`.
-cryptarch -q 'whoami'
+cryptarch -query 'whoami'
 
 # Execute `uptime` continuously, printing results to the console, without using persistence.
-cryptarch -q 'uptime' -t -1 -e=false
+cryptarch \
+    -count -1 \
+    -query 'uptime' \
+    -store=none
 
-# Get the size of an NVME used space and output it to a table.
-cryptarch -q 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\''' -r 3 -v "NVME Used Space" -t -1
+# Get the size of an NVME disk's used space and output it to a table with the specific label "NVME
+Used Space".
+cryptarch \
+    -count -1 \
+    -display 3 \
+    -labels "NVME Used Space" \
+    -query 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\'''
 ```
 
 Future
@@ -78,17 +123,25 @@ Future
 
 I've been adding planned work into [project issues](https://github.com/spacez320/cryptarch/issues)
 and [project milestones](https://github.com/spacez320/cryptarch/milestone/1)--take a look there to
-see what's coming or make suggestions.
+see what's coming or to make suggestions.
 
 Planned improvements include things like:
 
-- Background execution and persistent results.
-- Ability to perform calculations on streams of data, such as aggregates, rates, or quantile math.
-- Better text result management, such as diff'ing.
-- Export data to external systems, such as Prometheus.
-- More detailed graph display modes.
+- [ ] Background execution.
+- [x] Persistent results.
+- [ ] Ability to perform calculations on streams of data, such as aggregates, rates, or quantile math.
+- [ ] Better text result management, such as diff'ing.
+- [x] Export data to external systems, such as Prometheus.
+- [ ] ... and Elasticsearch.
+- [ ] More detailed and varied display modes.
+- [ ] Historical querying.
 
 Similar Projects
 ----------------
 
+There doesn't seem to be much out there easily visible that matches the same set of functionality,
+but there are a few projects I've found that do some things similarly.
+
 - [DataDash](https://github.com/keithknott26/datadash), a data visualization tool for the terminal.
+- [Euoporie](https://github.com/joouha/euporie), a terminal interactive computing environment for
+  Jupyter.
