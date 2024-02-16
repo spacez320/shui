@@ -36,24 +36,11 @@ jobs:
           args: release --snapshot --clean --skip=announce,publish
           distribution: goreleaser
           version: latest
-      - env:
-          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-          DOCKER_HUB_USERNAME: spacez320
-        run: |
-          podman login --password $DOCKER_HUB_TOKEN --username $DOCKER_HUB_USERNAME
-
+      - run: |
           podman build \
             --file build/package/Containerfile \
             --tag spacez320/cryptarch:${{ github.sha }} \
             .
-
-          podman tag \
-            spacez320/cryptarch:${{ github.sha }} \
-            spacez320/cryptarch:${{ github.ref_name }} \
-            spacez320/cryptarch:latest
-
-          podman push spacez320/cryptarch:${{ github.ref_name }}
-          podman push spacez320/cryptarch:latest
 
   release:
     if: ${{ startsWith(github.ref_name, 'refs/tags') }}  # Only run on tags.
