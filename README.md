@@ -7,6 +7,7 @@ operations in a command line.
 
 - It's like a better `watch` that can draw graphs, tables, etc.
 - It's like a simplified Prometheus that can run directly in your console.
+- It can act as a bridge between a command line and external monitoring systems.
 
 This project is in an active, "alpha" development phase, but should generally be useable.
 
@@ -54,9 +55,8 @@ produce a number).
 
 Cryptarch, by default, will store results and load them when re-executing the same query.
 
-The only currently supported storage is local disk, located in the user's cache directory.
-
-See: <https://pkg.go.dev/os#UserCacheDir>
+The only currently supported storage is local disk, located in the user's cache directory. See:
+<https://pkg.go.dev/os#UserCacheDir>.
 
 ### Integrations
 
@@ -69,10 +69,10 @@ Both normal Prometheus collection and Pushgateway are supported.
 
 ```sh
 # Start a Prometheus collection HTTP page.
-cryptarch --prometheus <address>
+cryptarch --prometheus-exporter <address>
 
 # Specify a Prometheus Pushgateway address to send results to.
-cryptarch --pushgateway <address>
+cryptarch --prometheus-pushgateway <address>
 ```
 
 - Metrics name will have the structure `cryptarch_<query>` where `<query>` will be changed to
