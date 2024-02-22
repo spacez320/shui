@@ -16,8 +16,9 @@ var (
 
 // Shareable configuration.
 type Config struct {
-	LogLevel        string // Log level.
-	PushgatewayAddr string // Pushgateway address.
+	LogLevel               string // Log level.
+	PrometheusExporterAddr string // Prometheus exporter address.
+	PushgatewayAddr        string // Pushgateway address.
 }
 
 // Retrieves an Slog level from a human-readable level string.

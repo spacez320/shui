@@ -150,6 +150,7 @@ func Results(
 	var (
 		err         error                      // General error holder.
 		pushgateway storage.PushgatewayStorage // Pushgateway configuraiton.
+		prometheus  storage.PrometheusStorage  // Prometheus configuration.
 
 		filters = ctx.Value("filters").([]string) // Capture filters from context.
 		labels  = ctx.Value("labels").([]string)  // Capture labels from context.
@@ -171,6 +172,10 @@ func Results(
 	if config.PushgatewayAddr != "" {
 		pushgateway = storage.NewPushgatewayStorage(config.PushgatewayAddr)
 		store.AddExternalStorage(&pushgateway)
+	}
+	if config.PrometheusExporterAddr != "" {
+		prometheus = storage.NewPrometheusStorage(config.PrometheusExporterAddr)
+		store.AddExternalStorage(&prometheus)
 	}
 
 	// Initialize reader indexes.

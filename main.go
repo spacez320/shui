@@ -102,9 +102,9 @@ func main() {
 	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
 	flag.StringVar(&logLevel, "log-level", "error", "Log level.")
 	flag.StringVar(&port, "rpc-port", "12345", "Port for RPC.")
-	flag.StringVar(&promExporterAddr, "prometheus-exporter", "127.0.0.1:8080",
+	flag.StringVar(&promExporterAddr, "prometheus-exporter", "",
 		"Address to present Prometheus metrics.")
-	flag.StringVar(&promPushgatewayAddr, "prometheus-pushgateway", "127.0.0.1:9091",
+	flag.StringVar(&promPushgatewayAddr, "prometheus-pushgateway", "",
 		"Address for Prometheus Pushgateway.")
 	flag.Var(&queries, "query", "Query to execute. Can be supplied multiple times. When in query"+
 		"mode, this is expected to be some command. When in profile mode it is expected to be PID.")
@@ -176,8 +176,9 @@ func main() {
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			history,
 			lib.Config{
-				LogLevel:        logLevel,
-				PushgatewayAddr: promPushgatewayAddr,
+				LogLevel:               logLevel,
+				PrometheusExporterAddr: promExporterAddr,
+				PushgatewayAddr:        promPushgatewayAddr,
 			},
 			pauseQueryChans,
 			resultsReadyChan,
