@@ -145,6 +145,7 @@ func Results(
 	history bool,
 	inputConfig Config,
 	inputPauseQueryChans map[string]chan bool,
+	resultsReadyChan chan bool,
 ) {
 	var (
 		err         error                      // General error holder.
@@ -177,6 +178,10 @@ func Results(
 	for _, query := range queries {
 		readerIndexes[query] = store.NewReaderIndex(query)
 	}
+
+	// Signals that results are ready to be received.
+	slog.Debug("Results are ready to receive.")
+	resultsReadyChan <- true
 
 	for {
 		// Assign current context and restore default values.

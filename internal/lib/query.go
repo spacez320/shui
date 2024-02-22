@@ -26,13 +26,13 @@ func runQuery(
 	doneChan, pauseChan chan bool,
 	queryFunc func(string, bool),
 ) {
-	// This loop executes as long as attempts has not been reached, or
-	// indefinitely if attempts is less than zero.
+	// This loop executes as long as attempts has not been reached, or indefinitely if attempts is
+	// less than zero.
 	for i := 0; attempts < 0 || i < attempts; i++ {
 		select {
 		case <-pauseChan:
-			// Manage pausing. If we receive from the pause channel, wait for another
-			// message from the pause channel.
+			// Manage pausing. If we receive from the pause channel, wait for another message from the
+			// pause channel.
 			<-pauseChan
 		default:
 			queryFunc(query, history)
@@ -96,11 +96,12 @@ func Query(
 	queries []string,
 	port string,
 	history bool,
+	resultsReadyChan chan bool,
 ) (chan bool, map[string]chan bool) {
 	var (
 		doneQueriesChan = make(chan bool)                          // Signals overall completion.
-		doneQueryChan   = make(chan bool, len(queries))            // Signals query completions.
-		pauseQueryChans = make(map[string]chan bool, len(queries)) // Pause channels for queries.
+		doneQueryChan   = make(chan bool, len(queries))            // Signals specific query completions.
+		pauseQueryChans = make(map[string]chan bool, len(queries)) // Signals query pausing.
 	)
 
 	// Start the RPC server.
@@ -109,33 +110,41 @@ func Query(
 	for _, query := range queries {
 		// Initialize pause channels.
 		pauseQueryChans[query] = make(chan bool)
-
-		// Execute the queries.
-		switch queryMode {
-		case QUERY_MODE_COMMAND:
-			slog.Debug("Executing in query mode command.")
-			go runQuery(
-				query,
-				attempts,
-				delay,
-				history,
-				doneQueryChan,
-				pauseQueryChans[query],
-				runQueryExec,
-			)
-		case QUERY_MODE_PROFILE:
-			slog.Debug("Executing in query mode profile.")
-			go runQuery(
-				query,
-				attempts,
-				delay,
-				history,
-				doneQueryChan,
-				pauseQueryChans[query],
-				runQueryProfile,
-			)
-		}
 	}
+
+	go func() {
+		// Wait for result consumption to become ready.
+		slog.Debug("Waiting for results readiness ...")
+		<-resultsReadyChan
+
+		for _, query := range queries {
+			// Execute the queries.
+			switch queryMode {
+			case QUERY_MODE_COMMAND:
+				slog.Debug("Executing in query mode command.")
+				go runQuery(
+					query,
+					attempts,
+					delay,
+					history,
+					doneQueryChan,
+					pauseQueryChans[query],
+					runQueryExec,
+				)
+			case QUERY_MODE_PROFILE:
+				slog.Debug("Executing in query mode profile.")
+				go runQuery(
+					query,
+					attempts,
+					delay,
+					history,
+					doneQueryChan,
+					pauseQueryChans[query],
+					runQueryProfile,
+				)
+			}
+		}
+	}()
 
 	// Begin the goroutine to wait for query completion.
 	go func() {

@@ -85,8 +85,10 @@ func parseCommaDelimitedArg(arg string) []string {
 
 func main() {
 	var (
-		doneQueriesChan chan bool            // Channels for tracking query completion.
+		doneQueriesChan chan bool            // Channel for tracking query completion.
 		pauseQueryChans map[string]chan bool // Channels for pausing queries.
+
+		resultsReadyChan = make(chan bool) // Channel for signaling results readiness.
 	)
 
 	// Define arguments.
@@ -132,6 +134,7 @@ func main() {
 			queries,
 			port,
 			history,
+			resultsReadyChan,
 		)
 
 		// Process mode has specific labels--ignore user provided ones.
@@ -146,6 +149,7 @@ func main() {
 			queries,
 			port,
 			history,
+			resultsReadyChan,
 		)
 
 		// Rely on user-defined labels.
@@ -176,6 +180,7 @@ func main() {
 				PushgatewayAddr: promPushgatewayAddr,
 			},
 			pauseQueryChans,
+			resultsReadyChan,
 		)
 	}
 
