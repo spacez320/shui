@@ -81,17 +81,11 @@ type PrometheusStorage struct {
 // Register a result in a Prometheus registry.
 func (p *PrometheusStorage) Put(query string, labels []string, result Result) error {
 	var (
-		err error // General error holder.
-		// instance string               // Prometheus instance value.
+		err    error                // General error holder.
 		metric *prometheus.GaugeVec // Produced metric to push.
 
 		name = queryToPromMetricName(query) // Name for the metric.
 	)
-	// Get the instance value.
-	// instance, err = getPromInstance()
-	// if err != nil {
-	// 	return err
-	// }
 
 	// Build the metric.
 	metric, err = resultToPromMetric(name, labels, result)
