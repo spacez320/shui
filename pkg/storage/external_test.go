@@ -13,7 +13,7 @@ func TestQueryToPromName(t *testing.T) {
 
 	// It gets a result matching the time.
 	for input, expected := range tests {
-		if got := queryToPromName(input); got != expected {
+		if got := queryToPromMetricName(input); got != expected {
 			t.Errorf("Got: %v Expected: %v\n", got, expected)
 		}
 	}
