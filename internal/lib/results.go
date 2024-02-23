@@ -145,10 +145,12 @@ func Results(
 	history bool,
 	inputConfig Config,
 	inputPauseQueryChans map[string]chan bool,
+	resultsReadyChan chan bool,
 ) {
 	var (
 		err         error                      // General error holder.
 		pushgateway storage.PushgatewayStorage // Pushgateway configuraiton.
+		prometheus  storage.PrometheusStorage  // Prometheus configuration.
 
 		filters = ctx.Value("filters").([]string) // Capture filters from context.
 		labels  = ctx.Value("labels").([]string)  // Capture labels from context.
@@ -171,12 +173,20 @@ func Results(
 		pushgateway = storage.NewPushgatewayStorage(config.PushgatewayAddr)
 		store.AddExternalStorage(&pushgateway)
 	}
+	if config.PrometheusExporterAddr != "" {
+		prometheus = storage.NewPrometheusStorage(config.PrometheusExporterAddr)
+		store.AddExternalStorage(&prometheus)
+	}
 
 	// Initialize reader indexes.
 	readerIndexes = make(map[string]*storage.ReaderIndex, len(queries))
 	for _, query := range queries {
 		readerIndexes[query] = store.NewReaderIndex(query)
 	}
+
+	// Signals that results are ready to be received.
+	slog.Debug("Results are ready to receive.")
+	resultsReadyChan <- true
 
 	for {
 		// Assign current context and restore default values.

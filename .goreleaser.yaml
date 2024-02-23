@@ -10,7 +10,9 @@ before:
     # - go generate ./...  # Leaving for future use.
 
 builds:
-  - goos:
+  - env:
+      - CGO_ENABLED=0
+    goos:
       - darwin
       - linux
 

@@ -49,18 +49,19 @@ const (
 )
 
 var (
-	count           int        // Number of attempts to execute the query.
-	delay           int        // Delay between queries.
-	displayMode     int        // Result mode to display.
-	filters         string     // Result filters.
-	history         bool       // Whether or not to preserve or use historical results.
-	logLevel        string     // Log level.
-	mode            int        // Mode to execute in.
-	port            string     // Port for RPC.
-	pushgatewayAddr string     // Address for Prometheus Pushg
-	queries         queriesArg // Queries to execute.
-	silent          bool       // Whether or not to be quiet.
-	labels          string     // Result value labels.
+	count               int        // Number of attempts to execute the query.
+	delay               int        // Delay between queries.
+	displayMode         int        // Result mode to display.
+	filters             string     // Result filters.
+	history             bool       // Whether or not to preserve or use historical results.
+	logLevel            string     // Log level.
+	mode                int        // Mode to execute in.
+	port                string     // Port for RPC.
+	promExporterAddr    string     // Address for Prometheus metrics page.
+	promPushgatewayAddr string     // Address for Prometheus Pushgateway.
+	queries             queriesArg // Queries to execute.
+	silent              bool       // Whether or not to be quiet.
+	labels              string     // Result value labels.
 
 	ctx                    = context.Background() // Initialize context.
 	logger                 = log.Default()        // Logging system.
@@ -84,8 +85,10 @@ func parseCommaDelimitedArg(arg string) []string {
 
 func main() {
 	var (
-		doneQueriesChan chan bool            // Channels for tracking query completion.
+		doneQueriesChan chan bool            // Channel for tracking query completion.
 		pauseQueryChans map[string]chan bool // Channels for pausing queries.
+
+		resultsReadyChan = make(chan bool) // Channel for signaling results readiness.
 	)
 
 	// Define arguments.
@@ -97,9 +100,12 @@ func main() {
 	flag.IntVar(&mode, "mode", int(MODE_QUERY), "Mode to execute in.")
 	flag.StringVar(&filters, "filters", "", "Results filters.")
 	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
-	flag.StringVar(&logLevel, "logLevel", "error", "Log level.")
-	flag.StringVar(&port, "port", "12345", "Port for RPC.")
-	flag.StringVar(&pushgatewayAddr, "pushgateway", "127.0.0.1:9091", "Address for Prometheus Pushgateway.")
+	flag.StringVar(&logLevel, "log-level", "error", "Log level.")
+	flag.StringVar(&port, "rpc-port", "12345", "Port for RPC.")
+	flag.StringVar(&promExporterAddr, "prometheus-exporter", "",
+		"Address to present Prometheus metrics.")
+	flag.StringVar(&promPushgatewayAddr, "prometheus-pushgateway", "",
+		"Address for Prometheus Pushgateway.")
 	flag.Var(&queries, "query", "Query to execute. Can be supplied multiple times. When in query"+
 		"mode, this is expected to be some command. When in profile mode it is expected to be PID.")
 	flag.Parse()
@@ -128,6 +134,7 @@ func main() {
 			queries,
 			port,
 			history,
+			resultsReadyChan,
 		)
 
 		// Process mode has specific labels--ignore user provided ones.
@@ -142,6 +149,7 @@ func main() {
 			queries,
 			port,
 			history,
+			resultsReadyChan,
 		)
 
 		// Rely on user-defined labels.
@@ -168,10 +176,12 @@ func main() {
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			history,
 			lib.Config{
-				LogLevel:        logLevel,
-				PushgatewayAddr: pushgatewayAddr,
+				LogLevel:               logLevel,
+				PrometheusExporterAddr: promExporterAddr,
+				PushgatewayAddr:        promPushgatewayAddr,
 			},
 			pauseQueryChans,
+			resultsReadyChan,
 		)
 	}
 

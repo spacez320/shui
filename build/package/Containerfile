@@ -1,0 +1,5 @@
+FROM scratch
+WORKDIR /cryptarch
+COPY dist/cryptarch_linux_amd64_v1/cryptarch .
+ENTRYPOINT ["/cryptarch/cryptarch"]
+CMD ["-h"]
