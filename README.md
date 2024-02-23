@@ -23,6 +23,9 @@ Usage
 Cryptarch expects a **query** to gather data with (e.g. a CLI command, a process ID, etc.). Queries
 produce **results** that are parsed automatically and stored as a time series.
 
+> Note: I'm not good at making gifs, so some of the commands shown may be outdated, even if the
+> functionality isn't.
+
 ### Modes
 
 Cryptarch has **"modes"** that determine what type of query should be provided.
