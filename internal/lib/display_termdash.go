@@ -28,6 +28,12 @@ func (t *termdashTextWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+// Used to supply optional widgets to Termdash initialization.
+type termDashWidgets struct {
+	helpWidget, logsWidget *text.Text       // Accessory widgets which are always text.
+	resultsWidget          widgetapi.Widget // Results widget, which varies by display type.
+}
+
 var (
 	appTermdash *tcell.Terminal    // Termdash display.
 	cancel      context.CancelFunc // Cancel function for the termdash display.
@@ -78,10 +84,13 @@ func errorTermdashHandler(e error) {
 }
 
 // Sets-up the termdash container, which defines the overall layout, and begins running the display.
-func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget) {
+// func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget) {
+func initDisplayTermdash(widgets termDashWidgets) {
 	var (
-		ctx context.Context // Termdash specific context.
-		err error           // General error holder.
+		ctx              context.Context      // Termdash specific context.
+		err              error                // General error holder.
+		logsWidgetWriter termdashTextWriter   // Writer implementation for logs.
+		widgetContainer  *container.Container // Wrapper for widgets.
 	)
 
 	// Set-up the context and enable it to close on key-press.
@@ -91,47 +100,117 @@ func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget)
 	appTermdash, err = tcell.New()
 	e(err)
 
-	// Render the widget.
-	c, err := container.New(
-		appTermdash,
-		container.PaddingBottom(OUTER_PADDING_BOTTOM),
-		container.PaddingLeft(OUTER_PADDING_LEFT),
-		container.PaddingTop(OUTER_PADDING_TOP),
-		container.PaddingRight(OUTER_PADDING_RIGHT),
-		container.SplitHorizontal(
-			container.Top(
-				container.Border(linestyle.Light),
-				container.BorderTitle("Results"),
-				container.BorderTitleAlignCenter(),
-				container.PlaceWidget(resultsWidget),
-			),
-			container.Bottom(
-				container.SplitHorizontal(
-					container.Top(
-						container.Border(linestyle.Light),
-						container.BorderTitle("Help"),
-						container.BorderTitleAlignCenter(),
-						container.PlaceWidget(helpWidget),
-					),
-					container.Bottom(
-						container.Border(linestyle.Light),
-						container.BorderTitle("Logs"),
-						container.BorderTitleAlignCenter(),
-						container.PlaceWidget(logsWidget),
-					),
-					container.SplitOption(container.SplitPercent(RelativePerc(RESULTS_SIZE, HELP_SIZE))),
+	if widgets.helpWidget != nil && widgets.logsWidget != nil {
+		// All widgets enabled.
+		widgetContainer, err = container.New(
+			appTermdash,
+			container.PaddingBottom(OUTER_PADDING_BOTTOM),
+			container.PaddingLeft(OUTER_PADDING_LEFT),
+			container.PaddingTop(OUTER_PADDING_TOP),
+			container.PaddingRight(OUTER_PADDING_RIGHT),
+			container.SplitHorizontal(
+				container.Top(
+					container.Border(linestyle.Light),
+					container.BorderTitle("Results"),
+					container.BorderTitleAlignCenter(),
+					container.PlaceWidget(widgets.resultsWidget),
 				),
+				container.Bottom(
+					container.SplitHorizontal(
+						container.Top(
+							container.Border(linestyle.Light),
+							container.BorderTitle("Help"),
+							container.BorderTitleAlignCenter(),
+							container.PlaceWidget(widgets.helpWidget),
+						),
+						container.Bottom(
+							container.Border(linestyle.Light),
+							container.BorderTitle("Logs"),
+							container.BorderTitleAlignCenter(),
+							container.PlaceWidget(widgets.logsWidget),
+						),
+						container.SplitOption(container.SplitPercent(RelativePerc(RESULTS_SIZE, HELP_SIZE))),
+					),
+				),
+				container.SplitOption(container.SplitPercent(RESULTS_SIZE)),
 			),
-			container.SplitOption(container.SplitPercent(RESULTS_SIZE)),
-		),
-	)
+		)
+	} else if widgets.helpWidget != nil {
+		// We have just the help widget enabled.
+		widgetContainer, err = container.New(
+			appTermdash,
+			container.PaddingBottom(OUTER_PADDING_BOTTOM),
+			container.PaddingLeft(OUTER_PADDING_LEFT),
+			container.PaddingTop(OUTER_PADDING_TOP),
+			container.PaddingRight(OUTER_PADDING_RIGHT),
+			container.SplitHorizontal(
+				container.Top(
+					container.Border(linestyle.Light),
+					container.BorderTitle("Results"),
+					container.BorderTitleAlignCenter(),
+					container.PlaceWidget(widgets.resultsWidget),
+				),
+				container.Bottom(
+					container.Border(linestyle.Light),
+					container.BorderTitle("Help"),
+					container.BorderTitleAlignCenter(),
+					container.PlaceWidget(widgets.helpWidget),
+				),
+				container.SplitOption(container.SplitPercent(RESULTS_SIZE+LOGS_SIZE)),
+			),
+		)
+	} else if widgets.logsWidget != nil {
+		// We have just the logs widget enabled. We also need to point logs to it.
+		logsWidgetWriter = termdashTextWriter{text: *widgets.logsWidget}
+		slog.SetDefault(slog.New(slog.NewTextHandler(
+			&logsWidgetWriter,
+			&slog.HandlerOptions{Level: config.SlogLogLevel()},
+		)))
+
+		widgetContainer, err = container.New(
+			appTermdash,
+			container.PaddingBottom(OUTER_PADDING_BOTTOM),
+			container.PaddingLeft(OUTER_PADDING_LEFT),
+			container.PaddingTop(OUTER_PADDING_TOP),
+			container.PaddingRight(OUTER_PADDING_RIGHT),
+			container.SplitHorizontal(
+				container.Top(
+					container.Border(linestyle.Light),
+					container.BorderTitle("Results"),
+					container.BorderTitleAlignCenter(),
+					container.PlaceWidget(widgets.resultsWidget),
+				),
+				container.Bottom(
+					container.Border(linestyle.Light),
+					container.BorderTitle("Logs"),
+					container.BorderTitleAlignCenter(),
+					container.PlaceWidget(&logsWidgetWriter.text),
+				),
+				container.SplitOption(container.SplitPercent(RESULTS_SIZE+HELP_SIZE)),
+			),
+		)
+	} else {
+		// Just the results pane.
+		widgetContainer, err = container.New(
+			appTermdash,
+			container.PaddingBottom(OUTER_PADDING_BOTTOM),
+			container.PaddingLeft(OUTER_PADDING_LEFT),
+			container.PaddingTop(OUTER_PADDING_TOP),
+			container.PaddingRight(OUTER_PADDING_RIGHT),
+			container.Border(linestyle.Light),
+			container.BorderTitle("Results"),
+			container.BorderTitleAlignCenter(),
+			container.PlaceWidget(widgets.resultsWidget),
+		)
+	}
+
 	e(err)
 
 	// Run the display.
 	termdash.Run(
 		ctx,
 		appTermdash,
-		c,
+		widgetContainer,
 		termdash.ErrorHandler(errorTermdashHandler),
 		termdash.KeyboardSubscriber(keyboardTermdashHandler),
 	)

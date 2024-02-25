@@ -11,7 +11,6 @@ import (
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/widgets/sparkline"
 	"github.com/mum4k/termdash/widgets/text"
-	"golang.org/x/exp/slog"
 )
 
 // Display driver constants. Each display mode uses a specific display driver.
@@ -110,7 +109,7 @@ func RawDisplay(query string) {
 }
 
 // Update the results pane with new results as they are generated.
-func StreamDisplay(query string) {
+func StreamDisplay(query string, showHelp, showLogs bool) {
 	var (
 		reader = readerIndexes[query] // Reader index for the query.
 	)
@@ -120,7 +119,15 @@ func StreamDisplay(query string) {
 	reader.Dec()
 
 	// Initialize the display.
-	resultsView, _, _ := initDisplayTviewText(helpText())
+	resultsView, helpView, logsView, flexBox := initDisplayTviewText(helpText())
+
+	// Hide displays we don't want to show.
+	if !showHelp {
+		flexBox.RemoveItem(helpView)
+	}
+	if !showLogs {
+		flexBox.RemoveItem(logsView)
+	}
 
 	// Start the display.
 	display(
@@ -156,7 +163,7 @@ func StreamDisplay(query string) {
 }
 
 // Creates a table of results for the results pane.
-func TableDisplay(query string, filters []string) {
+func TableDisplay(query string, filters []string, showHelp, showLogs bool) {
 	var (
 		reader           = readerIndexes[query]               // Reader index for the query.
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
@@ -168,7 +175,15 @@ func TableDisplay(query string, filters []string) {
 	reader.Dec()
 
 	// Initialize the display.
-	resultsView, _, _ := initDisplayTviewTable(helpText())
+	resultsView, helpView, logsView, flexBox := initDisplayTviewTable(helpText())
+
+	// Hide displays we don't want to show.
+	if !showHelp {
+		flexBox.RemoveItem(helpView)
+	}
+	if !showLogs {
+		flexBox.RemoveItem(logsView)
+	}
 
 	// Start the display.
 	display(
@@ -258,8 +273,11 @@ func TableDisplay(query string, filters []string) {
 }
 
 // Creates a graph of results for the results pane.
-func GraphDisplay(query string, filters []string) {
+func GraphDisplay(query string, filters []string, showHelp, showLogs bool) {
 	var (
+		helpWidget, logsWidget *text.Text           // Accessory widgets to display.
+		resultsWidget          *sparkline.SparkLine // Results widget.
+
 		reader     = readerIndexes[query] // Reader index for the query.
 		valueIndex = 0                    // Index of the result value to graph.
 	)
@@ -274,25 +292,24 @@ func GraphDisplay(query string, filters []string) {
 	}
 
 	// Initialize the results view.
-	resultWidget, err := sparkline.New(
+	resultsWidget, err := sparkline.New(
 		sparkline.Label(store.GetLabels(query)[valueIndex]),
 		sparkline.Color(cell.ColorGreen),
 	)
 	e(err)
 
 	// Initialize the help view.
-	helpWidget, err := text.New()
-	e(err)
-	helpWidget.Write(helpText())
+	if showHelp {
+		helpWidget, err = text.New()
+		e(err)
+		helpWidget.Write(helpText())
+	}
 
 	// Initialize the logs view.
-	logsWidget, err := text.New()
-	e(err)
-	logsWidgetWriter := termdashTextWriter{text: *logsWidget}
-	slog.SetDefault(slog.New(slog.NewTextHandler(
-		&logsWidgetWriter,
-		&slog.HandlerOptions{Level: config.SlogLogLevel()},
-	)))
+	if showLogs {
+		logsWidget, err = text.New()
+		e(err)
+	}
 
 	// Start the display.
 	display(
@@ -305,9 +322,9 @@ func GraphDisplay(query string, filters []string) {
 
 				switch value.(type) {
 				case int64:
-					resultWidget.Add([]int{int(value.(int64))})
+					resultsWidget.Add([]int{int(value.(int64))})
 				case float64:
-					resultWidget.Add([]int{int(value.(float64))})
+					resultsWidget.Add([]int{int(value.(float64))})
 				}
 			}
 
@@ -326,9 +343,9 @@ func GraphDisplay(query string, filters []string) {
 
 					switch value.(type) {
 					case int64:
-						resultWidget.Add([]int{int(value.(int64))})
+						resultsWidget.Add([]int{int(value.(int64))})
 					case float64:
-						resultWidget.Add([]int{int(value.(float64))})
+						resultsWidget.Add([]int{int(value.(float64))})
 					}
 				}
 			}
@@ -337,5 +354,9 @@ func GraphDisplay(query string, filters []string) {
 
 	// Initialize the display. This must happen after the display function is invoked, otherwise data
 	// will never appear.
-	initDisplayTermdash(resultWidget, helpWidget, &logsWidgetWriter.text)
+	initDisplayTermdash(termDashWidgets{
+		resultsWidget: resultsWidget,
+		helpWidget:    helpWidget,
+		logsWidget:    logsWidget,
+	})
 }

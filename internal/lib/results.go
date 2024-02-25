@@ -142,7 +142,7 @@ func Results(
 	ctx context.Context,
 	displayMode DisplayMode,
 	query string,
-	history bool,
+	history, showHelp, showLogs bool,
 	inputConfig Config,
 	inputPauseQueryChans map[string]chan bool,
 	resultsReadyChan chan bool,
@@ -204,13 +204,13 @@ func Results(
 			RawDisplay(query)
 		case DISPLAY_MODE_STREAM:
 			driver = DISPLAY_TVIEW
-			StreamDisplay(query)
+			StreamDisplay(query, showHelp, showLogs)
 		case DISPLAY_MODE_TABLE:
 			driver = DISPLAY_TVIEW
-			TableDisplay(query, filters)
+			TableDisplay(query, filters, showHelp, showLogs)
 		case DISPLAY_MODE_GRAPH:
 			driver = DISPLAY_TERMDASH
-			GraphDisplay(query, filters)
+			GraphDisplay(query, filters, showHelp, showLogs)
 		default:
 			slog.Error(fmt.Sprintf("Invalid result driver: %d\n", displayMode))
 			os.Exit(1)
