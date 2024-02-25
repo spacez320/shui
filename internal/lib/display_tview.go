@@ -67,6 +67,7 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 func initDisplayTviewTable(helpText string) (
 	resultsView *tview.Table,
 	helpView, logsView *tview.TextView,
+	flexBox *tview.Flex,
 ) {
 	resultsView = tview.NewTable()
 	helpView = tview.NewTextView()
@@ -76,13 +77,16 @@ func initDisplayTviewTable(helpText string) (
 	resultsView.SetBorders(true)
 	resultsView.SetBorder(true).SetTitle("Results")
 
-	initDisplayTview(resultsView, helpView, logsView, helpText)
+	flexBox = initDisplayTview(resultsView, helpView, logsView, helpText)
 
 	return
 }
 
 // Display init function specific to text results.
-func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tview.TextView) {
+func initDisplayTviewText(helpText string) (
+	resultsView, helpView, logsView *tview.TextView,
+	flexBox *tview.Flex,
+) {
 	resultsView = tview.NewTextView()
 	helpView = tview.NewTextView()
 	logsView = tview.NewTextView()
@@ -91,7 +95,7 @@ func initDisplayTviewText(helpText string) (resultsView, helpView, logsView *tvi
 	resultsView.SetChangedFunc(func() { appTview.Draw() })
 	resultsView.SetBorder(true).SetTitle("Results")
 
-	initDisplayTview(resultsView, helpView, logsView, helpText)
+	flexBox = initDisplayTview(resultsView, helpView, logsView, helpText)
 
 	return
 }
@@ -106,10 +110,8 @@ func initDisplayTview(
 	resultsView tview.Primitive,
 	helpView, logsView *tview.TextView,
 	helpText string,
-) {
-	var (
-		flexBox = tview.NewFlex() // Tview flexbox.
-	)
+) (flexBox *tview.Flex) {
+	flexBox = tview.NewFlex() // Tview flexbox.
 
 	// Set-up the layout and apply views.
 	flexBox = flexBox.SetDirection(tview.FlexRow).
@@ -136,4 +138,6 @@ func initDisplayTview(
 		logsView,
 		&slog.HandlerOptions{Level: config.SlogLogLevel()},
 	)))
+
+	return
 }

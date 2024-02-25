@@ -54,14 +54,16 @@ var (
 	displayMode         int        // Result mode to display.
 	filters             string     // Result filters.
 	history             bool       // Whether or not to preserve or use historical results.
+	labels              string     // Result value labels.
 	logLevel            string     // Log level.
 	mode                int        // Mode to execute in.
 	port                string     // Port for RPC.
 	promExporterAddr    string     // Address for Prometheus metrics page.
 	promPushgatewayAddr string     // Address for Prometheus Pushgateway.
 	queries             queriesArg // Queries to execute.
+	showHelp            bool       // Whether or not to show help.
+	showLogs            bool       // Whether or not to show logs.
 	silent              bool       // Whether or not to be quiet.
-	labels              string     // Result value labels.
 
 	ctx                    = context.Background() // Initialize context.
 	logger                 = log.Default()        // Logging system.
@@ -93,6 +95,8 @@ func main() {
 
 	// Define arguments.
 	flag.BoolVar(&history, "history", true, "Whether or not to use or preserve history.")
+	flag.BoolVar(&showHelp, "show-help", true, "Whether or not to show help displays.")
+	flag.BoolVar(&showLogs, "show-logs", false, "Whether or not to show log displays.")
 	flag.BoolVar(&silent, "silent", false, "Don't output anything to a console.")
 	flag.IntVar(&count, "count", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "delay", 3, "Delay between queries (seconds).")
@@ -175,6 +179,8 @@ func main() {
 			lib.DisplayMode(displayMode),
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			history,
+			showHelp,
+			showLogs,
 			lib.Config{
 				LogLevel:               logLevel,
 				PrometheusExporterAddr: promExporterAddr,

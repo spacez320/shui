@@ -146,5 +146,6 @@ There doesn't seem to be much out there easily visible that matches the same set
 but there are a few projects I've found that do some things similarly.
 
 - [DataDash](https://github.com/keithknott26/datadash), a data visualization tool for the terminal.
+- [Grafterm](https://github.com/slok/grafterm), visualize metrics dashboards on the terminal.
 - [Euoporie](https://github.com/joouha/euporie), a terminal interactive computing environment for
   Jupyter.
