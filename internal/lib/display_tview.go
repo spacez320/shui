@@ -1,5 +1,5 @@
 //
-// Display management for modes using Tview.
+// Display management for modes using tview.
 
 package lib
 
@@ -11,6 +11,13 @@ import (
 	"github.com/rivo/tview"
 	"golang.org/x/exp/slog"
 )
+
+// Widgets for tview displays.
+type tviewWidgets struct {
+	flexBox                                                        *tview.Flex
+	filterWidget, helpWidget, labelWidget, logsWidget, queryWidget *tview.TextView
+	resultsWidget                                                  tview.Primitive
+}
 
 var (
 	appTview = tview.NewApplication() // Tview application.
@@ -64,38 +71,26 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 }
 
 // Display init function specific to table results.
-func initDisplayTviewTable(helpText string) (
-	resultsView *tview.Table,
-	helpView, logsView *tview.TextView,
-	flexBox *tview.Flex,
-) {
-	resultsView = tview.NewTable()
-	helpView = tview.NewTextView()
-	logsView = tview.NewTextView()
-
+func initDisplayTviewTable(query string, filters, labels []string, showHelp, showLogs bool) (widgets tviewWidgets) {
 	// Initialize the results view.
-	resultsView.SetBorders(true)
-	resultsView.SetBorder(true).SetTitle("Results")
+	widgets.resultsWidget = tview.NewTable()
+	widgets.resultsWidget.(*tview.Table).SetBorders(true).SetBorder(true).SetTitle("Results")
 
-	flexBox = initDisplayTview(resultsView, helpView, logsView, helpText)
+	initDisplayTview(&widgets, query, filters, labels, showHelp, showLogs)
 
 	return
 }
 
 // Display init function specific to text results.
-func initDisplayTviewText(helpText string) (
-	resultsView, helpView, logsView *tview.TextView,
-	flexBox *tview.Flex,
-) {
-	resultsView = tview.NewTextView()
-	helpView = tview.NewTextView()
-	logsView = tview.NewTextView()
+func initDisplayTviewText(query string, filters, labels []string, showHelp, showLogs bool) (widgets tviewWidgets) {
+	// Initialize the results viw.
+	widgets.resultsWidget = tview.NewTextView()
+	widgets.resultsWidget.(*tview.TextView).
+		SetChangedFunc(func() { appTview.Draw() }).
+		SetBorder(true).
+		SetTitle("Results")
 
-	// Initialize the results view.
-	resultsView.SetChangedFunc(func() { appTview.Draw() })
-	resultsView.SetBorder(true).SetTitle("Results")
-
-	flexBox = initDisplayTview(resultsView, helpView, logsView, helpText)
+	initDisplayTview(&widgets, query, filters, labels, showHelp, showLogs)
 
 	return
 }
@@ -107,37 +102,67 @@ func initDisplayTviewText(helpText string) (
 // function. Note also that direct manipulation of the tview Primitives as subclasses (like
 // tview.Box) needs to happen outside this function, as well.
 func initDisplayTview(
-	resultsView tview.Primitive,
-	helpView, logsView *tview.TextView,
-	helpText string,
-) (flexBox *tview.Flex) {
-	flexBox = tview.NewFlex() // Tview flexbox.
+	widgets *tviewWidgets,
+	query string,
+	filters, labels []string,
+	showHelp, showLogs bool,
+) {
+	widgets.filterWidget = tview.NewTextView()
+	widgets.flexBox = tview.NewFlex()
+	widgets.helpWidget = tview.NewTextView()
+	widgets.labelWidget = tview.NewTextView()
+	widgets.logsWidget = tview.NewTextView()
+	widgets.queryWidget = tview.NewTextView()
 
 	// Set-up the layout and apply views.
-	flexBox = flexBox.SetDirection(tview.FlexRow).
-		AddItem(resultsView, 0, RESULTS_SIZE, false).
-		AddItem(helpView, 0, HELP_SIZE, false).
-		AddItem(logsView, 0, LOGS_SIZE, false)
-	flexBox.SetBorderPadding(
+	widgets.flexBox = widgets.flexBox.
+		SetDirection(tview.FlexRow).
+		AddItem(
+			tview.NewFlex().SetDirection(tview.FlexColumn).
+				AddItem(widgets.queryWidget, 0, 1, false).
+				AddItem(widgets.labelWidget, 0, 1, false).
+				AddItem(widgets.filterWidget, 0, 1, false),
+			3, 0, false,
+		).
+		AddItem(widgets.resultsWidget, 0, RESULTS_SIZE, false).
+		AddItem(widgets.helpWidget, 3, 0, false).
+		AddItem(widgets.logsWidget, 0, LOGS_SIZE, false)
+	widgets.flexBox.SetBorderPadding(
 		OUTER_PADDING_TOP,
 		OUTER_PADDING_BOTTOM,
 		OUTER_PADDING_LEFT,
 		OUTER_PADDING_RIGHT,
 	)
-	flexBox.SetInputCapture(keyboardTviewHandler)
-	appTview.SetRoot(flexBox, true).SetFocus(resultsView)
+	widgets.flexBox.SetInputCapture(keyboardTviewHandler)
+	appTview.SetRoot(widgets.flexBox, true).SetFocus(widgets.resultsWidget)
 
 	// Initialize the help view.
-	helpView.SetBorder(true).SetTitle("Help")
-	fmt.Fprintln(helpView, helpText)
+	widgets.helpWidget.SetBorder(true).SetTitle("Help")
+	fmt.Fprint(widgets.helpWidget, HELP_TEXT)
+
+	// Initialize the top-line status widgets.
+	widgets.filterWidget.SetBorder(true).SetTitle("Filters")
+	fmt.Fprintf(widgets.filterWidget, "%v", filters)
+	widgets.labelWidget.SetBorder(true).SetTitle("Labels")
+	fmt.Fprintf(widgets.labelWidget, "%v", labels)
+	widgets.queryWidget.SetBorder(true).SetTitle("Query")
+	fmt.Fprintf(widgets.queryWidget, query)
 
 	// Initialize the logs view.
-	logsView.SetScrollable(false).SetChangedFunc(func() { appTview.Draw() })
-	logsView.SetBorder(true).SetTitle("Logs")
+	widgets.logsWidget.SetScrollable(false).SetChangedFunc(func() { appTview.Draw() })
+	widgets.logsWidget.SetBorder(true).SetTitle("Logs")
 	slog.SetDefault(slog.New(slog.NewTextHandler(
-		logsView,
+		widgets.logsWidget,
 		&slog.HandlerOptions{Level: config.SlogLogLevel()},
 	)))
+
+	// Hide displays we don't want to show.
+	if !showHelp {
+		widgets.flexBox.RemoveItem(widgets.helpWidget)
+	}
+	if !showLogs {
+		widgets.flexBox.RemoveItem(widgets.logsWidget)
+	}
 
 	return
 }

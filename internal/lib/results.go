@@ -156,6 +156,7 @@ func Results(
 		labels  = ctx.Value("labels").([]string)  // Capture labels from context.
 		queries = ctx.Value("queries").([]string) // Capture queries from context.
 	)
+
 	// Assign global config and global control channels.
 	config, pauseQueryChans = inputConfig, inputPauseQueryChans
 	defer close(pauseDisplayChan)
@@ -204,13 +205,13 @@ func Results(
 			RawDisplay(query)
 		case DISPLAY_MODE_STREAM:
 			driver = DISPLAY_TVIEW
-			StreamDisplay(query, showHelp, showLogs)
+			StreamDisplay(query, filters, labels, showHelp, showLogs)
 		case DISPLAY_MODE_TABLE:
 			driver = DISPLAY_TVIEW
-			TableDisplay(query, filters, showHelp, showLogs)
+			TableDisplay(query, filters, labels, showHelp, showLogs)
 		case DISPLAY_MODE_GRAPH:
 			driver = DISPLAY_TERMDASH
-			GraphDisplay(query, filters, showHelp, showLogs)
+			GraphDisplay(query, filters, labels, showHelp, showLogs)
 		default:
 			slog.Error(fmt.Sprintf("Invalid result driver: %d\n", displayMode))
 			os.Exit(1)
