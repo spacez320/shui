@@ -5,6 +5,7 @@ package lib
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mum4k/termdash"
 	"github.com/mum4k/termdash/container"
@@ -29,9 +30,9 @@ func (t *termdashTextWriter) Write(p []byte) (n int, err error) {
 }
 
 // Used to supply optional widgets to Termdash initialization.
-type termDashWidgets struct {
-	helpWidget, logsWidget *text.Text       // Accessory widgets which are always text.
-	resultsWidget          widgetapi.Widget // Results widget, which varies by display type.
+type termdashWidgets struct {
+	filterWidget, helpWidget, labelWidget, logsWidget, queryWidget *text.Text
+	resultsWidget                                                  widgetapi.Widget
 }
 
 var (
@@ -85,13 +86,36 @@ func errorTermdashHandler(e error) {
 
 // Sets-up the termdash container, which defines the overall layout, and begins running the display.
 // func initDisplayTermdash(resultsWidget, helpWidget, logsWidget widgetapi.Widget) {
-func initDisplayTermdash(widgets termDashWidgets) {
+func initDisplayTermdash(
+	widgets termdashWidgets,
+	query string,
+	filters, labels []string,
+	showHelp, showLogs bool,
+) {
 	var (
 		ctx              context.Context      // Termdash specific context.
 		err              error                // General error holder.
 		logsWidgetWriter termdashTextWriter   // Writer implementation for logs.
+		topWidgets       container.Option     // Status and result widgets.
 		widgetContainer  *container.Container // Wrapper for widgets.
 	)
+	widgets.filterWidget, err = text.New()
+	e(err)
+	widgets.labelWidget, err = text.New()
+	e(err)
+	widgets.queryWidget, err = text.New()
+	e(err)
+
+	// Instantiate optional displays.
+	if showHelp {
+		widgets.helpWidget, err = text.New()
+		e(err)
+		widgets.helpWidget.Write(HELP_TEXT)
+	}
+	if showLogs {
+		widgets.logsWidget, err = text.New()
+		e(err)
+	}
 
 	// Set-up the context and enable it to close on key-press.
 	ctx, cancel = context.WithCancel(context.Background())
@@ -99,6 +123,44 @@ func initDisplayTermdash(widgets termDashWidgets) {
 	// Set-up the layout.
 	appTermdash, err = tcell.New()
 	e(err)
+
+	// Set-up the status widgets with results.
+	topWidgets = container.SplitHorizontal(
+		container.Top(
+			container.SplitVertical(
+				container.Left(
+					container.Border(linestyle.Light),
+					container.BorderTitle("Query"),
+					container.BorderTitleAlignCenter(),
+					container.PlaceWidget(widgets.queryWidget),
+				),
+				container.Right(
+					container.SplitVertical(
+						container.Left(
+							container.Border(linestyle.Light),
+							container.BorderTitle("Labels"),
+							container.BorderTitleAlignCenter(),
+							container.PlaceWidget(widgets.labelWidget),
+						),
+						container.Right(
+							container.Border(linestyle.Light),
+							container.BorderTitle("Filters"),
+							container.BorderTitleAlignCenter(),
+							container.PlaceWidget(widgets.labelWidget),
+						),
+					),
+				),
+				container.SplitPercent(33),
+			),
+		),
+		container.Bottom(
+			container.Border(linestyle.Light),
+			container.BorderTitle("Results"),
+			container.BorderTitleAlignCenter(),
+			container.PlaceWidget(widgets.resultsWidget),
+		),
+		container.SplitOption(container.SplitFixed(3)),
+	)
 
 	if widgets.helpWidget != nil && widgets.logsWidget != nil {
 		// All widgets enabled.
@@ -109,12 +171,7 @@ func initDisplayTermdash(widgets termDashWidgets) {
 			container.PaddingTop(OUTER_PADDING_TOP),
 			container.PaddingRight(OUTER_PADDING_RIGHT),
 			container.SplitHorizontal(
-				container.Top(
-					container.Border(linestyle.Light),
-					container.BorderTitle("Results"),
-					container.BorderTitleAlignCenter(),
-					container.PlaceWidget(widgets.resultsWidget),
-				),
+				container.Top(topWidgets),
 				container.Bottom(
 					container.SplitHorizontal(
 						container.Top(
@@ -129,10 +186,11 @@ func initDisplayTermdash(widgets termDashWidgets) {
 							container.BorderTitleAlignCenter(),
 							container.PlaceWidget(widgets.logsWidget),
 						),
-						container.SplitOption(container.SplitPercent(RelativePerc(RESULTS_SIZE, HELP_SIZE))),
+						container.SplitOption(container.SplitFixed(3)),
 					),
 				),
-				container.SplitOption(container.SplitPercent(RESULTS_SIZE)),
+				// XXX The +5 is to try to match tview's proportions.
+				container.SplitOption(container.SplitPercent(RESULTS_SIZE+5)),
 			),
 		)
 	} else if widgets.helpWidget != nil {
@@ -144,19 +202,18 @@ func initDisplayTermdash(widgets termDashWidgets) {
 			container.PaddingTop(OUTER_PADDING_TOP),
 			container.PaddingRight(OUTER_PADDING_RIGHT),
 			container.SplitHorizontal(
-				container.Top(
-					container.Border(linestyle.Light),
-					container.BorderTitle("Results"),
-					container.BorderTitleAlignCenter(),
-					container.PlaceWidget(widgets.resultsWidget),
-				),
+				container.Top(topWidgets),
 				container.Bottom(
 					container.Border(linestyle.Light),
 					container.BorderTitle("Help"),
 					container.BorderTitleAlignCenter(),
 					container.PlaceWidget(widgets.helpWidget),
 				),
-				container.SplitOption(container.SplitPercent(RESULTS_SIZE+LOGS_SIZE)),
+				// TODO This is a heuristic to make the Help pane small because termdash does not allow
+				// sizing on latter elements.
+				//
+				// See: https://github.com/mum4k/termdash/issues/292
+				container.SplitOption(container.SplitPercent(97)),
 			),
 		)
 	} else if widgets.logsWidget != nil {
@@ -174,19 +231,15 @@ func initDisplayTermdash(widgets termDashWidgets) {
 			container.PaddingTop(OUTER_PADDING_TOP),
 			container.PaddingRight(OUTER_PADDING_RIGHT),
 			container.SplitHorizontal(
-				container.Top(
-					container.Border(linestyle.Light),
-					container.BorderTitle("Results"),
-					container.BorderTitleAlignCenter(),
-					container.PlaceWidget(widgets.resultsWidget),
-				),
+				container.Top(topWidgets),
 				container.Bottom(
 					container.Border(linestyle.Light),
 					container.BorderTitle("Logs"),
 					container.BorderTitleAlignCenter(),
 					container.PlaceWidget(&logsWidgetWriter.text),
 				),
-				container.SplitOption(container.SplitPercent(RESULTS_SIZE+HELP_SIZE)),
+				// XXX The -1 is to try to match tview's proportions.
+				container.SplitOption(container.SplitPercent(RESULTS_SIZE+HELP_SIZE-1)),
 			),
 		)
 	} else {
@@ -197,14 +250,15 @@ func initDisplayTermdash(widgets termDashWidgets) {
 			container.PaddingLeft(OUTER_PADDING_LEFT),
 			container.PaddingTop(OUTER_PADDING_TOP),
 			container.PaddingRight(OUTER_PADDING_RIGHT),
-			container.Border(linestyle.Light),
-			container.BorderTitle("Results"),
-			container.BorderTitleAlignCenter(),
-			container.PlaceWidget(widgets.resultsWidget),
+			topWidgets,
 		)
 	}
-
 	e(err)
+
+	// Initialize the top-line status widgets.
+	widgets.queryWidget.Write(query)
+	widgets.filterWidget.Write(fmt.Sprintf("%v", filters))
+	widgets.labelWidget.Write(fmt.Sprintf("%v", labels))
 
 	// Run the display.
 	termdash.Run(

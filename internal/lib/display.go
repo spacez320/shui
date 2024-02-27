@@ -10,8 +10,14 @@ import (
 
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/widgets/sparkline"
-	"github.com/mum4k/termdash/widgets/text"
+	"github.com/rivo/tview"
 )
+
+// Represents the display driver.
+type DisplayDriver int
+
+// Represents the display mode.
+type DisplayMode int
 
 // Display driver constants. Each display mode uses a specific display driver.
 const (
@@ -50,12 +56,6 @@ var (
 	interruptChan = make(chan bool) // Channel for interrupting displays.
 )
 
-// Represents the display driver.
-type DisplayDriver int
-
-// Represents the display mode.
-type DisplayMode int
-
 // Starts the display. Applies contextual logic depending on the provided display driver. Expects a
 // function to execute within a goroutine to update the display.
 func display(driver DisplayDriver, displayUpdateFunc func()) {
@@ -76,15 +76,6 @@ func display(driver DisplayDriver, displayUpdateFunc func()) {
 // Clean-up display logic when fully quitting.
 func displayQuit() {
 	close(interruptChan)
-}
-
-// Creates help text for any display.
-func helpText() string {
-	return HELP_TEXT + fmt.Sprintf(
-		"\nQuery: %v | Labels: %v | Filters: %v",
-		currentCtx.Value("query"),
-		store.GetLabels(currentCtx.Value("query").(string)),
-		currentCtx.Value("filters"))
 }
 
 // Presents raw output.
@@ -109,25 +100,17 @@ func RawDisplay(query string) {
 }
 
 // Update the results pane with new results as they are generated.
-func StreamDisplay(query string, showHelp, showLogs bool) {
+func StreamDisplay(query string, filters, labels []string, showHelp, showLogs bool) {
 	var (
 		reader = readerIndexes[query] // Reader index for the query.
 	)
 
-	// Wait for the first result to appear to synchronize storage.
+	// ait for the first result to appear to synchronize storage.
 	GetResultWait(query)
 	reader.Dec()
 
 	// Initialize the display.
-	resultsView, helpView, logsView, flexBox := initDisplayTviewText(helpText())
-
-	// Hide displays we don't want to show.
-	if !showHelp {
-		flexBox.RemoveItem(helpView)
-	}
-	if !showLogs {
-		flexBox.RemoveItem(logsView)
-	}
+	widgets := initDisplayTviewText(query, filters, labels, showHelp, showLogs)
 
 	// Start the display.
 	display(
@@ -135,12 +118,12 @@ func StreamDisplay(query string, showHelp, showLogs bool) {
 		func() {
 			// Print labels as the first line.
 			appTview.QueueUpdateDraw(func() {
-				fmt.Fprintln(resultsView, store.GetLabels(query))
+				fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), labels)
 			})
 
 			// Print all previous results.
 			for _, result := range store.GetToIndex(query, reader) {
-				fmt.Fprintln(resultsView, result.Value)
+				fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), result.Value)
 			}
 
 			// Print results.
@@ -155,7 +138,7 @@ func StreamDisplay(query string, showHelp, showLogs bool) {
 					<-pauseDisplayChan
 				default:
 					// We can display the next result.
-					fmt.Fprintln(resultsView, (GetResult(query)).Value)
+					fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), (GetResult(query)).Value)
 				}
 			}
 		},
@@ -163,8 +146,10 @@ func StreamDisplay(query string, showHelp, showLogs bool) {
 }
 
 // Creates a table of results for the results pane.
-func TableDisplay(query string, filters []string, showHelp, showLogs bool) {
+func TableDisplay(query string, filters, labels []string, showHelp, showLogs bool) {
 	var (
+		widgets tviewWidgets // Widgets produced by tview.
+
 		reader           = readerIndexes[query]               // Reader index for the query.
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
@@ -175,15 +160,7 @@ func TableDisplay(query string, filters []string, showHelp, showLogs bool) {
 	reader.Dec()
 
 	// Initialize the display.
-	resultsView, helpView, logsView, flexBox := initDisplayTviewTable(helpText())
-
-	// Hide displays we don't want to show.
-	if !showHelp {
-		flexBox.RemoveItem(helpView)
-	}
-	if !showLogs {
-		flexBox.RemoveItem(logsView)
-	}
+	widgets = initDisplayTviewTable(query, filters, labels, showHelp, showLogs)
 
 	// Start the display.
 	display(
@@ -191,7 +168,8 @@ func TableDisplay(query string, filters []string, showHelp, showLogs bool) {
 		func() {
 			var (
 				nextCellContent string // Next cell to add to the table.
-				i               = 0    // Used to determine the next row index.
+
+				i = 0 // Used to determine the next row index.
 			)
 
 			// Determine the value indexes to populate into the graph. If no filter is provided, the index
@@ -204,9 +182,9 @@ func TableDisplay(query string, filters []string, showHelp, showLogs bool) {
 
 			appTview.QueueUpdateDraw(func() {
 				// Row to contain the labels.
-				headerRow := resultsView.InsertRow(i)
+				headerRow := widgets.resultsWidget.(*tview.Table).InsertRow(i)
 
-				for j, label := range FilterSlice(store.GetLabels(query), valueIndexes) {
+				for j, label := range FilterSlice(labels, valueIndexes) {
 					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
 				}
 			})
@@ -216,7 +194,7 @@ func TableDisplay(query string, filters []string, showHelp, showLogs bool) {
 			for _, result := range store.GetToIndex(query, reader) {
 				appTview.QueueUpdateDraw(func() {
 					var (
-						row = resultsView.InsertRow(i) // Row to contain the result.
+						row = widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
 					)
 
 					for j, value := range FilterSlice(result.Values, valueIndexes) {
@@ -249,7 +227,7 @@ func TableDisplay(query string, filters []string, showHelp, showLogs bool) {
 					// We can display the next result.
 					appTview.QueueUpdateDraw(func() {
 						var (
-							row = resultsView.InsertRow(i) // Row to contain the result.
+							row = widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
 						)
 
 						for j, value := range FilterSlice((GetResult(query)).Values, valueIndexes) {
@@ -273,13 +251,13 @@ func TableDisplay(query string, filters []string, showHelp, showLogs bool) {
 }
 
 // Creates a graph of results for the results pane.
-func GraphDisplay(query string, filters []string, showHelp, showLogs bool) {
+func GraphDisplay(query string, filters, labels []string, showHelp, showLogs bool) {
 	var (
-		helpWidget, logsWidget *text.Text           // Accessory widgets to display.
-		resultsWidget          *sparkline.SparkLine // Results widget.
+		err error // General error holder.
 
 		reader     = readerIndexes[query] // Reader index for the query.
 		valueIndex = 0                    // Index of the result value to graph.
+		widgets    = termdashWidgets{}    // Widgets for displaying.
 	)
 
 	// Wait for the first result to appear to synchronize storage.
@@ -292,24 +270,14 @@ func GraphDisplay(query string, filters []string, showHelp, showLogs bool) {
 	}
 
 	// Initialize the results view.
-	resultsWidget, err := sparkline.New(
-		sparkline.Label(store.GetLabels(query)[valueIndex]),
+	//
+	// XXX This should probably moved into `display_termdash.go` once termdash is managing more types
+	// of result displays.
+	widgets.resultsWidget, err = sparkline.New(
+		sparkline.Label(labels[valueIndex]),
 		sparkline.Color(cell.ColorGreen),
 	)
 	e(err)
-
-	// Initialize the help view.
-	if showHelp {
-		helpWidget, err = text.New()
-		e(err)
-		helpWidget.Write(helpText())
-	}
-
-	// Initialize the logs view.
-	if showLogs {
-		logsWidget, err = text.New()
-		e(err)
-	}
 
 	// Start the display.
 	display(
@@ -322,9 +290,9 @@ func GraphDisplay(query string, filters []string, showHelp, showLogs bool) {
 
 				switch value.(type) {
 				case int64:
-					resultsWidget.Add([]int{int(value.(int64))})
+					widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(int64))})
 				case float64:
-					resultsWidget.Add([]int{int(value.(float64))})
+					widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(float64))})
 				}
 			}
 
@@ -343,9 +311,9 @@ func GraphDisplay(query string, filters []string, showHelp, showLogs bool) {
 
 					switch value.(type) {
 					case int64:
-						resultsWidget.Add([]int{int(value.(int64))})
+						widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(int64))})
 					case float64:
-						resultsWidget.Add([]int{int(value.(float64))})
+						widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(float64))})
 					}
 				}
 			}
@@ -354,9 +322,5 @@ func GraphDisplay(query string, filters []string, showHelp, showLogs bool) {
 
 	// Initialize the display. This must happen after the display function is invoked, otherwise data
 	// will never appear.
-	initDisplayTermdash(termDashWidgets{
-		resultsWidget: resultsWidget,
-		helpWidget:    helpWidget,
-		logsWidget:    logsWidget,
-	})
+	initDisplayTermdash(widgets, query, filters, labels, showHelp, showLogs)
 }
