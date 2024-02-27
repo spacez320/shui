@@ -110,6 +110,7 @@ func initDisplayTermdash(
 	if showHelp {
 		widgets.helpWidget, err = text.New()
 		e(err)
+		widgets.helpWidget.Write(HELP_TEXT)
 	}
 	if showLogs {
 		widgets.logsWidget, err = text.New()
@@ -188,7 +189,8 @@ func initDisplayTermdash(
 						container.SplitOption(container.SplitFixed(3)),
 					),
 				),
-				container.SplitOption(container.SplitPercent(RESULTS_SIZE)),
+				// XXX The +5 is to try to match tview's proportions.
+				container.SplitOption(container.SplitPercent(RESULTS_SIZE+5)),
 			),
 		)
 	} else if widgets.helpWidget != nil {
@@ -207,7 +209,11 @@ func initDisplayTermdash(
 					container.BorderTitleAlignCenter(),
 					container.PlaceWidget(widgets.helpWidget),
 				),
-				container.SplitOption(container.SplitPercent(97)), // This is a heuristic.
+				// TODO This is a heuristic to make the Help pane small because termdash does not allow
+				// sizing on latter elements.
+				//
+				// See: https://github.com/mum4k/termdash/issues/292
+				container.SplitOption(container.SplitPercent(97)),
 			),
 		)
 	} else if widgets.logsWidget != nil {
@@ -232,7 +238,8 @@ func initDisplayTermdash(
 					container.BorderTitleAlignCenter(),
 					container.PlaceWidget(&logsWidgetWriter.text),
 				),
-				container.SplitOption(container.SplitPercent(RESULTS_SIZE+HELP_SIZE)),
+				// XXX The -1 is to try to match tview's proportions.
+				container.SplitOption(container.SplitPercent(RESULTS_SIZE+HELP_SIZE-1)),
 			),
 		)
 	} else {
@@ -247,9 +254,6 @@ func initDisplayTermdash(
 		)
 	}
 	e(err)
-
-	// Initialize the help view.
-	widgets.helpWidget.Write(HELP_TEXT)
 
 	// Initialize the top-line status widgets.
 	widgets.queryWidget.Write(query)
