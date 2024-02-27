@@ -71,7 +71,11 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 }
 
 // Display init function specific to table results.
-func initDisplayTviewTable(query string, filters, labels []string, showHelp, showLogs bool) (widgets tviewWidgets) {
+func initDisplayTviewTable(
+	query string,
+	filters, labels []string,
+	showHelp, showLogs bool,
+) (widgets tviewWidgets) {
 	// Initialize the results view.
 	widgets.resultsWidget = tview.NewTable()
 	widgets.resultsWidget.(*tview.Table).SetBorders(true).SetBorder(true).SetTitle("Results")

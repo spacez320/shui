@@ -148,6 +148,8 @@ func StreamDisplay(query string, filters, labels []string, showHelp, showLogs bo
 // Creates a table of results for the results pane.
 func TableDisplay(query string, filters, labels []string, showHelp, showLogs bool) {
 	var (
+		widgets tviewWidgets // Widgets produced by tview.
+
 		reader           = readerIndexes[query]               // Reader index for the query.
 		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
 		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
@@ -158,7 +160,7 @@ func TableDisplay(query string, filters, labels []string, showHelp, showLogs boo
 	reader.Dec()
 
 	// Initialize the display.
-	widgets := initDisplayTviewTable(query, filters, labels, showHelp, showLogs)
+	widgets = initDisplayTviewTable(query, filters, labels, showHelp, showLogs)
 
 	// Start the display.
 	display(
@@ -166,7 +168,8 @@ func TableDisplay(query string, filters, labels []string, showHelp, showLogs boo
 		func() {
 			var (
 				nextCellContent string // Next cell to add to the table.
-				i               = 0    // Used to determine the next row index.
+
+				i = 0 // Used to determine the next row index.
 			)
 
 			// Determine the value indexes to populate into the graph. If no filter is provided, the index
