@@ -13,8 +13,10 @@ import (
 	_ "golang.org/x/exp/slog"
 )
 
+// Tokenized result value.
 type Values []interface{}
 
+// Retrieve an indexed token.
 func (v Values) Get(index int) (result interface{}) {
 	// Return an empty value if we didn't find an indexed value. This can happen if empty results are
 	// stored.

@@ -90,7 +90,8 @@ func main() {
 		doneQueriesChan chan bool            // Channel for tracking query completion.
 		pauseQueryChans map[string]chan bool // Channels for pausing queries.
 
-		resultsReadyChan = make(chan bool) // Channel for signaling results readiness.
+		displayConfig    = lib.NewDisplayConfig() // Configuration for display modes.
+		resultsReadyChan = make(chan bool)        // Channel for signaling results readiness.
 	)
 
 	// Define arguments.
@@ -173,7 +174,6 @@ func main() {
 	ctx = context.WithValue(ctx, "queries", queries.ToStrings())
 
 	// Set-up display configuration.
-	displayConfig := *lib.NewDisplayConfig()
 	displayConfig.ShowHelp = showHelp
 	displayConfig.ShowLogs = showLogs
 
@@ -184,7 +184,7 @@ func main() {
 			lib.DisplayMode(displayMode),
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			history,
-			&displayConfig,
+			displayConfig,
 			&lib.Config{
 				LogLevel:               logLevel,
 				PrometheusExporterAddr: promExporterAddr,
