@@ -74,19 +74,23 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 func initDisplayTviewTable(
 	query string,
 	filters, labels []string,
-	showHelp, showLogs bool,
+	displayConfig *DisplayConfig,
 ) (widgets tviewWidgets) {
 	// Initialize the results view.
 	widgets.resultsWidget = tview.NewTable()
 	widgets.resultsWidget.(*tview.Table).SetBorders(true).SetBorder(true).SetTitle("Results")
 
-	initDisplayTview(&widgets, query, filters, labels, showHelp, showLogs)
+	initDisplayTview(&widgets, query, filters, labels, displayConfig)
 
 	return
 }
 
 // Display init function specific to text results.
-func initDisplayTviewText(query string, filters, labels []string, showHelp, showLogs bool) (widgets tviewWidgets) {
+func initDisplayTviewText(
+	query string,
+	filters, labels []string,
+	displayConfig *DisplayConfig,
+) (widgets tviewWidgets) {
 	// Initialize the results viw.
 	widgets.resultsWidget = tview.NewTextView()
 	widgets.resultsWidget.(*tview.TextView).
@@ -94,7 +98,7 @@ func initDisplayTviewText(query string, filters, labels []string, showHelp, show
 		SetBorder(true).
 		SetTitle("Results")
 
-	initDisplayTview(&widgets, query, filters, labels, showHelp, showLogs)
+	initDisplayTview(&widgets, query, filters, labels, displayConfig)
 
 	return
 }
@@ -109,7 +113,7 @@ func initDisplayTview(
 	widgets *tviewWidgets,
 	query string,
 	filters, labels []string,
-	showHelp, showLogs bool,
+	displayConfig *DisplayConfig,
 ) {
 	widgets.filterWidget = tview.NewTextView()
 	widgets.flexBox = tview.NewFlex()
@@ -128,14 +132,14 @@ func initDisplayTview(
 				AddItem(widgets.filterWidget, 0, 1, false),
 			3, 0, false,
 		).
-		AddItem(widgets.resultsWidget, 0, RESULTS_SIZE, false).
+		AddItem(widgets.resultsWidget, 0, displayConfig.ResultsSize, false).
 		AddItem(widgets.helpWidget, 3, 0, false).
-		AddItem(widgets.logsWidget, 0, LOGS_SIZE, false)
+		AddItem(widgets.logsWidget, 0, displayConfig.LogsSize, false)
 	widgets.flexBox.SetBorderPadding(
-		OUTER_PADDING_TOP,
-		OUTER_PADDING_BOTTOM,
-		OUTER_PADDING_LEFT,
-		OUTER_PADDING_RIGHT,
+		displayConfig.OuterPaddingTop,
+		displayConfig.OuterPaddingBottom,
+		displayConfig.OuterPaddingLeft,
+		displayConfig.OuterPaddingRight,
 	)
 	widgets.flexBox.SetInputCapture(keyboardTviewHandler)
 	appTview.SetRoot(widgets.flexBox, true).SetFocus(widgets.resultsWidget)
@@ -161,10 +165,10 @@ func initDisplayTview(
 	)))
 
 	// Hide displays we don't want to show.
-	if !showHelp {
+	if !displayConfig.ShowHelp {
 		widgets.flexBox.RemoveItem(widgets.helpWidget)
 	}
-	if !showLogs {
+	if !displayConfig.ShowLogs {
 		widgets.flexBox.RemoveItem(widgets.logsWidget)
 	}
 

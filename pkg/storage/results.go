@@ -13,11 +13,23 @@ import (
 	_ "golang.org/x/exp/slog"
 )
 
+type Values []interface{}
+
+func (v Values) Get(index int) (result interface{}) {
+	// Return an empty value if we didn't find an indexed value. This can happen if empty results are
+	// stored.
+	if len(v) > index {
+		result = v[index]
+	}
+
+	return
+}
+
 // Individual result.
 type Result struct {
-	Time   time.Time     // Time the result was created.
-	Value  string        // Raw value of the result.
-	Values []interface{} // Tokenized value of the result.
+	Time   time.Time // Time the result was created.
+	Value  string    // Raw value of the result.
+	Values Values    // Tokenized value of the result.
 }
 
 // Collection of results.

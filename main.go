@@ -172,6 +172,11 @@ func main() {
 	ctx = context.WithValue(ctx, "filters", parseCommaDelimitedArg(filters))
 	ctx = context.WithValue(ctx, "queries", queries.ToStrings())
 
+	// Set-up display configuration.
+	displayConfig := *lib.NewDisplayConfig()
+	displayConfig.ShowHelp = showHelp
+	displayConfig.ShowLogs = showLogs
+
 	// Execute result viewing.
 	if !silent {
 		lib.Results(
@@ -179,9 +184,8 @@ func main() {
 			lib.DisplayMode(displayMode),
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			history,
-			showHelp,
-			showLogs,
-			lib.Config{
+			&displayConfig,
+			&lib.Config{
 				LogLevel:               logLevel,
 				PrometheusExporterAddr: promExporterAddr,
 				PushgatewayAddr:        promPushgatewayAddr,

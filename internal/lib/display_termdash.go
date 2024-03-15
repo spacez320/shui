@@ -90,7 +90,7 @@ func initDisplayTermdash(
 	widgets termdashWidgets,
 	query string,
 	filters, labels []string,
-	showHelp, showLogs bool,
+	displayConfig *DisplayConfig,
 ) {
 	var (
 		ctx              context.Context      // Termdash specific context.
@@ -107,12 +107,12 @@ func initDisplayTermdash(
 	e(err)
 
 	// Instantiate optional displays.
-	if showHelp {
+	if displayConfig.ShowHelp {
 		widgets.helpWidget, err = text.New()
 		e(err)
 		widgets.helpWidget.Write(HELP_TEXT)
 	}
-	if showLogs {
+	if displayConfig.ShowLogs {
 		widgets.logsWidget, err = text.New()
 		e(err)
 	}
@@ -166,10 +166,10 @@ func initDisplayTermdash(
 		// All widgets enabled.
 		widgetContainer, err = container.New(
 			appTermdash,
-			container.PaddingBottom(OUTER_PADDING_BOTTOM),
-			container.PaddingLeft(OUTER_PADDING_LEFT),
-			container.PaddingTop(OUTER_PADDING_TOP),
-			container.PaddingRight(OUTER_PADDING_RIGHT),
+			container.PaddingBottom(displayConfig.OuterPaddingBottom),
+			container.PaddingLeft(displayConfig.OuterPaddingLeft),
+			container.PaddingTop(displayConfig.OuterPaddingTop),
+			container.PaddingRight(displayConfig.OuterPaddingRight),
 			container.SplitHorizontal(
 				container.Top(topWidgets),
 				container.Bottom(
@@ -190,17 +190,17 @@ func initDisplayTermdash(
 					),
 				),
 				// XXX The +5 is to try to match tview's proportions.
-				container.SplitOption(container.SplitPercent(RESULTS_SIZE+5)),
+				container.SplitOption(container.SplitPercent(displayConfig.ResultsSize+5)),
 			),
 		)
 	} else if widgets.helpWidget != nil {
 		// We have just the help widget enabled.
 		widgetContainer, err = container.New(
 			appTermdash,
-			container.PaddingBottom(OUTER_PADDING_BOTTOM),
-			container.PaddingLeft(OUTER_PADDING_LEFT),
-			container.PaddingTop(OUTER_PADDING_TOP),
-			container.PaddingRight(OUTER_PADDING_RIGHT),
+			container.PaddingBottom(displayConfig.OuterPaddingBottom),
+			container.PaddingLeft(displayConfig.OuterPaddingLeft),
+			container.PaddingTop(displayConfig.OuterPaddingTop),
+			container.PaddingRight(displayConfig.OuterPaddingRight),
 			container.SplitHorizontal(
 				container.Top(topWidgets),
 				container.Bottom(
@@ -226,10 +226,10 @@ func initDisplayTermdash(
 
 		widgetContainer, err = container.New(
 			appTermdash,
-			container.PaddingBottom(OUTER_PADDING_BOTTOM),
-			container.PaddingLeft(OUTER_PADDING_LEFT),
-			container.PaddingTop(OUTER_PADDING_TOP),
-			container.PaddingRight(OUTER_PADDING_RIGHT),
+			container.PaddingBottom(displayConfig.OuterPaddingBottom),
+			container.PaddingLeft(displayConfig.OuterPaddingLeft),
+			container.PaddingTop(displayConfig.OuterPaddingTop),
+			container.PaddingRight(displayConfig.OuterPaddingRight),
 			container.SplitHorizontal(
 				container.Top(topWidgets),
 				container.Bottom(
@@ -239,17 +239,18 @@ func initDisplayTermdash(
 					container.PlaceWidget(&logsWidgetWriter.text),
 				),
 				// XXX The -1 is to try to match tview's proportions.
-				container.SplitOption(container.SplitPercent(RESULTS_SIZE+HELP_SIZE-1)),
+				container.SplitOption(
+					container.SplitPercent(displayConfig.ResultsSize+displayConfig.HelpSize-1)),
 			),
 		)
 	} else {
 		// Just the results pane.
 		widgetContainer, err = container.New(
 			appTermdash,
-			container.PaddingBottom(OUTER_PADDING_BOTTOM),
-			container.PaddingLeft(OUTER_PADDING_LEFT),
-			container.PaddingTop(OUTER_PADDING_TOP),
-			container.PaddingRight(OUTER_PADDING_RIGHT),
+			container.PaddingBottom(displayConfig.OuterPaddingBottom),
+			container.PaddingLeft(displayConfig.OuterPaddingLeft),
+			container.PaddingTop(displayConfig.OuterPaddingTop),
+			container.PaddingRight(displayConfig.OuterPaddingRight),
 			topWidgets,
 		)
 	}
