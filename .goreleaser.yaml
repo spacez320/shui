@@ -10,7 +10,8 @@ before:
     # - go generate ./...  # Leaving for future use.
 
 builds:
-  - env:
+  - dir: cmd/cryptarch
+    env:
       - CGO_ENABLED=0
     goos:
       - darwin
