@@ -12,9 +12,9 @@ import (
 	"os"
 	"strings"
 
-	"internal/lib"
-
 	"golang.org/x/exp/slog"
+
+	"github.com/spacez320/cryptarch/internal/lib"
 )
 
 // Represents the mode value.

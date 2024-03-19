@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"pkg/storage"
+	"github.com/spacez320/cryptarch/pkg/storage"
 )
 
 func TestFilterResult(t *testing.T) {
