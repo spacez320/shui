@@ -1,6 +1,10 @@
 cryptarch
 =========
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/spacez320/cryptarch)](https://goreportcard.com/report/github.com/spacez320/cryptarch)
+[![Go Reference](https://pkg.go.dev/badge/github.com/spacez320/cryptarch/cmd/cryptarch.svg)](https://pkg.go.dev/github.com/spacez320/cryptarch/cmd/cryptarch)
+![GitHub Release](https://img.shields.io/github/v/release/spacez320/cryptarch)
+
 Cryptarch is a tool that can be used to extract information with a CLI and observe it over time. It
 is meant to aid system administrators, platform engineers, or anyone who spends time doing
 operations in a command line.
