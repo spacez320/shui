@@ -150,7 +150,7 @@ func Results(
 ) {
 	var (
 		err         error                      // General error holder.
-		pushgateway storage.PushgatewayStorage // Pushgateway configuraiton.
+		pushgateway storage.PushgatewayStorage // Pushgateway configuration.
 		prometheus  storage.PrometheusStorage  // Prometheus configuration.
 
 		filters = ctx.Value("filters").([]string) // Capture filters from context.

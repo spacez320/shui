@@ -123,7 +123,7 @@ cryptarch \
     -store=none
 
 # Get the size of an NVME disk's used space and output it to a table with the specific label "NVME
-Used Space".
+# Used Space".
 cryptarch \
     -count -1 \
     -display 3 \
@@ -148,6 +148,7 @@ Planned improvements include things like:
 - [ ] ... and Elasticsearch.
 - [ ] More detailed and varied display modes.
 - [ ] Historical querying.
+- [ ] Beter management of textual data, including diffs.
 
 Similar Projects
 ----------------
