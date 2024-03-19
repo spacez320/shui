@@ -63,6 +63,10 @@ var (
 	labels              string     // Result value labels.
 	logLevel            string     // Log level.
 	mode                int        // Mode to execute in.
+	outerPaddingBottom  int        // Bottom padding settings.
+	outerPaddingLeft    int        // Left padding settings.
+	outerPaddingRight   int        // Right padding settings.
+	outerPaddingTop     int        // Top padding settings.
 	port                string     // Port for RPC.
 	promExporterAddr    string     // Address for Prometheus metrics page.
 	promPushgatewayAddr string     // Address for Prometheus Pushgateway.
@@ -109,6 +113,10 @@ func main() {
 	flag.IntVar(&delay, "delay", 3, "Delay between queries (seconds).")
 	flag.IntVar(&displayMode, "display", int(lib.DISPLAY_MODE_RAW), "Result mode to display.")
 	flag.IntVar(&mode, "mode", int(MODE_QUERY), "Mode to execute in.")
+	flag.IntVar(&outerPaddingBottom, "outer-padding-bottom", -1, "Bottom display padding.")
+	flag.IntVar(&outerPaddingLeft, "outer-padding-left", -1, "Left display padding.")
+	flag.IntVar(&outerPaddingRight, "outer-padding-right", -1, "Right display padding.")
+	flag.IntVar(&outerPaddingTop, "outer-padding-top", -1, "Top display padding.")
 	flag.StringVar(&filters, "filters", "", "Results filters.")
 	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
 	flag.StringVar(&logLevel, "log-level", "error", "Log level.")
@@ -182,6 +190,18 @@ func main() {
 	// Set-up display configuration.
 	displayConfig.ShowHelp = showHelp
 	displayConfig.ShowLogs = showLogs
+	if outerPaddingBottom >= 0 {
+		displayConfig.OuterPaddingBottom = outerPaddingBottom
+	}
+	if outerPaddingLeft >= 0 {
+		displayConfig.OuterPaddingLeft = outerPaddingLeft
+	}
+	if outerPaddingRight >= 0 {
+		displayConfig.OuterPaddingRight = outerPaddingRight
+	}
+	if outerPaddingTop >= 0 {
+		displayConfig.OuterPaddingTop = outerPaddingTop
+	}
 
 	// Execute result viewing.
 	if !silent {
