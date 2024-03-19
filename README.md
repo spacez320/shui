@@ -17,6 +17,12 @@ Setup
 - Binaries are available from [the releases page](https://github.com/spacez320/cryptarch/releases).
 - Docker images are available on [Docker Hub](https://hub.docker.com/repository/docker/spacez320/cryptarch).
 
+You can also just:
+
+```sh
+go install github.com/spacez320/cryptarch/cmd/cryptarch@latest
+```
+
 Usage
 -----
 
