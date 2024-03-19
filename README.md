@@ -1,6 +1,10 @@
 cryptarch
 =========
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/spacez320/cryptarch)](https://goreportcard.com/report/github.com/spacez320/cryptarch)
+[![Go Reference](https://pkg.go.dev/badge/github.com/spacez320/cryptarch/cmd/cryptarch.svg)](https://pkg.go.dev/github.com/spacez320/cryptarch/cmd/cryptarch)
+![GitHub Release](https://img.shields.io/github/v/release/spacez320/cryptarch)
+
 Cryptarch is a tool that can be used to extract information with a CLI and observe it over time. It
 is meant to aid system administrators, platform engineers, or anyone who spends time doing
 operations in a command line.
@@ -119,7 +123,7 @@ cryptarch \
     -store=none
 
 # Get the size of an NVME disk's used space and output it to a table with the specific label "NVME
-Used Space".
+# Used Space".
 cryptarch \
     -count -1 \
     -display 3 \
@@ -144,6 +148,7 @@ Planned improvements include things like:
 - [ ] ... and Elasticsearch.
 - [ ] More detailed and varied display modes.
 - [ ] Historical querying.
+- [ ] Beter management of textual data, including diffs.
 
 Similar Projects
 ----------------
