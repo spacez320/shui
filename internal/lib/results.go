@@ -142,8 +142,9 @@ func Results(
 	ctx context.Context,
 	displayMode DisplayMode,
 	query string,
-	history, showHelp, showLogs bool,
-	inputConfig Config,
+	history bool,
+	displayConfig *DisplayConfig,
+	inputConfig *Config,
 	inputPauseQueryChans map[string]chan bool,
 	resultsReadyChan chan bool,
 ) {
@@ -158,7 +159,7 @@ func Results(
 	)
 
 	// Assign global config and global control channels.
-	config, pauseQueryChans = inputConfig, inputPauseQueryChans
+	config, pauseQueryChans = *inputConfig, inputPauseQueryChans
 	defer close(pauseDisplayChan)
 	for _, pauseQueryChan := range pauseQueryChans {
 		defer close(pauseQueryChan)
@@ -205,13 +206,13 @@ func Results(
 			RawDisplay(query)
 		case DISPLAY_MODE_STREAM:
 			driver = DISPLAY_TVIEW
-			StreamDisplay(query, filters, labels, showHelp, showLogs)
+			StreamDisplay(query, filters, labels, displayConfig)
 		case DISPLAY_MODE_TABLE:
 			driver = DISPLAY_TVIEW
-			TableDisplay(query, filters, labels, showHelp, showLogs)
+			TableDisplay(query, filters, labels, displayConfig)
 		case DISPLAY_MODE_GRAPH:
 			driver = DISPLAY_TERMDASH
-			GraphDisplay(query, filters, labels, showHelp, showLogs)
+			GraphDisplay(query, filters, labels, displayConfig)
 		default:
 			slog.Error(fmt.Sprintf("Invalid result driver: %d\n", displayMode))
 			os.Exit(1)

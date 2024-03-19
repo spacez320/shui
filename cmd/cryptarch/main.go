@@ -48,6 +48,12 @@ const (
 	MODE_READ                         // For running in 'read' mode.
 )
 
+// Misc. constants.
+const (
+	CONFIG_FILE_DIR  = "cryptarch"
+	CONFIG_FILE_NAME = "cryptarch.yaml"
+)
+
 var (
 	count               int        // Number of attempts to execute the query.
 	delay               int        // Delay between queries.
@@ -57,12 +63,17 @@ var (
 	labels              string     // Result value labels.
 	logLevel            string     // Log level.
 	mode                int        // Mode to execute in.
+	outerPaddingBottom  int        // Bottom padding settings.
+	outerPaddingLeft    int        // Left padding settings.
+	outerPaddingRight   int        // Right padding settings.
+	outerPaddingTop     int        // Top padding settings.
 	port                string     // Port for RPC.
 	promExporterAddr    string     // Address for Prometheus metrics page.
 	promPushgatewayAddr string     // Address for Prometheus Pushgateway.
 	queries             queriesArg // Queries to execute.
-	showHelp            bool       // Whether or not to show help.
+	showHelp            bool       // Whether or not to show helpt
 	showLogs            bool       // Whether or not to show logs.
+	showStatus          bool       // Whether or not to show statuses.
 	silent              bool       // Whether or not to be quiet.
 
 	ctx                    = context.Background() // Initialize context.
@@ -90,18 +101,24 @@ func main() {
 		doneQueriesChan chan bool            // Channel for tracking query completion.
 		pauseQueryChans map[string]chan bool // Channels for pausing queries.
 
-		resultsReadyChan = make(chan bool) // Channel for signaling results readiness.
+		displayConfig    = lib.NewDisplayConfig() // Configuration for display modes.
+		resultsReadyChan = make(chan bool)        // Channel for signaling results readiness.
 	)
 
 	// Define arguments.
 	flag.BoolVar(&history, "history", true, "Whether or not to use or preserve history.")
 	flag.BoolVar(&showHelp, "show-help", true, "Whether or not to show help displays.")
 	flag.BoolVar(&showLogs, "show-logs", false, "Whether or not to show log displays.")
+	flag.BoolVar(&showStatus, "show-status", true, "Whether or not to show status displays.")
 	flag.BoolVar(&silent, "silent", false, "Don't output anything to a console.")
 	flag.IntVar(&count, "count", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "delay", 3, "Delay between queries (seconds).")
 	flag.IntVar(&displayMode, "display", int(lib.DISPLAY_MODE_RAW), "Result mode to display.")
 	flag.IntVar(&mode, "mode", int(MODE_QUERY), "Mode to execute in.")
+	flag.IntVar(&outerPaddingBottom, "outer-padding-bottom", -1, "Bottom display padding.")
+	flag.IntVar(&outerPaddingLeft, "outer-padding-left", -1, "Left display padding.")
+	flag.IntVar(&outerPaddingRight, "outer-padding-right", -1, "Right display padding.")
+	flag.IntVar(&outerPaddingTop, "outer-padding-top", -1, "Top display padding.")
 	flag.StringVar(&filters, "filters", "", "Results filters.")
 	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
 	flag.StringVar(&logLevel, "log-level", "error", "Log level.")
@@ -172,6 +189,23 @@ func main() {
 	ctx = context.WithValue(ctx, "filters", parseCommaDelimitedArg(filters))
 	ctx = context.WithValue(ctx, "queries", queries.ToStrings())
 
+	// Set-up display configuration.
+	displayConfig.ShowHelp = showHelp
+	displayConfig.ShowLogs = showLogs
+	displayConfig.ShowStatus = showStatus
+	if outerPaddingBottom >= 0 {
+		displayConfig.OuterPaddingBottom = outerPaddingBottom
+	}
+	if outerPaddingLeft >= 0 {
+		displayConfig.OuterPaddingLeft = outerPaddingLeft
+	}
+	if outerPaddingRight >= 0 {
+		displayConfig.OuterPaddingRight = outerPaddingRight
+	}
+	if outerPaddingTop >= 0 {
+		displayConfig.OuterPaddingTop = outerPaddingTop
+	}
+
 	// Execute result viewing.
 	if !silent {
 		lib.Results(
@@ -179,9 +213,8 @@ func main() {
 			lib.DisplayMode(displayMode),
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			history,
-			showHelp,
-			showLogs,
-			lib.Config{
+			displayConfig,
+			&lib.Config{
 				LogLevel:               logLevel,
 				PrometheusExporterAddr: promExporterAddr,
 				PushgatewayAddr:        promPushgatewayAddr,

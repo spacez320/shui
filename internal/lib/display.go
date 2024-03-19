@@ -13,6 +13,14 @@ import (
 	"github.com/rivo/tview"
 )
 
+// General configuration for display modes.
+type DisplayConfig struct {
+	HelpSize, LogsSize, ResultsSize                                          int  // Proportional size of widgets.
+	OuterPaddingBottom, OuterPaddingLeft, OuterPaddingRight, OuterPaddingTop int  // Padding for the full display.
+	ShowHelp, ShowLogs, ShowStatus                                           bool // Whether or not to show widgets.
+	TablePadding                                                             int  // Padding for table cells in table displays.
+}
+
 // Represents the display driver.
 type DisplayDriver int
 
@@ -34,16 +42,21 @@ const (
 	DISPLAY_MODE_GRAPH                         // For running in 'graph' display mode.
 )
 
+// Defaults for display configs.
 const (
-	HELP_TEXT            = "(ESC) Quit | (Space) Pause | (Tab) Next Display | (n) Next Query"
-	HELP_SIZE            = 10 // Proportional size of the logs widget.
-	LOGS_SIZE            = 15 // Proportional size of the logs widget.
-	OUTER_PADDING_LEFT   = 10 // Left padding for the full display.
-	OUTER_PADDING_RIGHT  = 10 // Right padding for the full display.
-	OUTER_PADDING_TOP    = 5  // Top padding for the full display.
-	OUTER_PADDING_BOTTOM = 5  // Bottom padding for the full display.
-	RESULTS_SIZE         = 75 // Proportional size of the results widget.
-	TABLE_PADDING        = 2  // Padding for table cell entries.
+	DEFAULT_HELP_SIZE            = 10
+	DEFAULT_LOGS_SIZE            = 15
+	DEFAULT_OUTER_PADDING_BOTTOM = 5
+	DEFAULT_OUTER_PADDING_LEFT   = 10
+	DEFAULT_OUTER_PADDING_RIGHT  = 10
+	DEFAULT_OUTER_PADDING_TOP    = 5
+	DEFAULT_RESULTS_SIZE         = 75
+	DEFAULT_TABLE_PADDING        = 2
+)
+
+// Misc. constants.
+const (
+	HELP_TEXT = "(ESC) Quit | (Space) Pause | (Tab) Next Display | (n) Next Query"
 )
 
 var (
@@ -78,6 +91,23 @@ func displayQuit() {
 	close(interruptChan)
 }
 
+// Creates a default display config.
+func NewDisplayConfig() *DisplayConfig {
+	return &DisplayConfig{
+		HelpSize:           DEFAULT_HELP_SIZE,
+		LogsSize:           DEFAULT_LOGS_SIZE,
+		OuterPaddingBottom: DEFAULT_OUTER_PADDING_BOTTOM,
+		OuterPaddingLeft:   DEFAULT_OUTER_PADDING_LEFT,
+		OuterPaddingRight:  DEFAULT_OUTER_PADDING_RIGHT,
+		OuterPaddingTop:    DEFAULT_OUTER_PADDING_TOP,
+		ResultsSize:        DEFAULT_RESULTS_SIZE,
+		ShowHelp:           true,
+		ShowLogs:           false,
+		ShowStatus:         true,
+		TablePadding:       DEFAULT_TABLE_PADDING,
+	}
+}
+
 // Presents raw output.
 func RawDisplay(query string) {
 	var (
@@ -100,7 +130,7 @@ func RawDisplay(query string) {
 }
 
 // Update the results pane with new results as they are generated.
-func StreamDisplay(query string, filters, labels []string, showHelp, showLogs bool) {
+func StreamDisplay(query string, filters, labels []string, displayConfig *DisplayConfig) {
 	var (
 		reader = readerIndexes[query] // Reader index for the query.
 	)
@@ -110,7 +140,7 @@ func StreamDisplay(query string, filters, labels []string, showHelp, showLogs bo
 	reader.Dec()
 
 	// Initialize the display.
-	widgets := initDisplayTviewText(query, filters, labels, showHelp, showLogs)
+	widgets := initDisplayTviewText(query, filters, labels, displayConfig)
 
 	// Start the display.
 	display(
@@ -146,13 +176,13 @@ func StreamDisplay(query string, filters, labels []string, showHelp, showLogs bo
 }
 
 // Creates a table of results for the results pane.
-func TableDisplay(query string, filters, labels []string, showHelp, showLogs bool) {
+func TableDisplay(query string, filters, labels []string, displayConfig *DisplayConfig) {
 	var (
 		widgets tviewWidgets // Widgets produced by tview.
 
-		reader           = readerIndexes[query]               // Reader index for the query.
-		tableCellPadding = strings.Repeat(" ", TABLE_PADDING) // Padding to add to table cell content.
-		valueIndexes     = []int{}                            // Indexes of the result values to add to the table.
+		reader           = readerIndexes[query]                            // Reader index for the query.
+		tableCellPadding = strings.Repeat(" ", displayConfig.TablePadding) // Padding to add to table cell content.
+		valueIndexes     = []int{}                                         // Indexes of the result values to add to the table.
 	)
 
 	// Wait for the first result to appear to synchronize storage.
@@ -160,7 +190,7 @@ func TableDisplay(query string, filters, labels []string, showHelp, showLogs boo
 	reader.Dec()
 
 	// Initialize the display.
-	widgets = initDisplayTviewTable(query, filters, labels, showHelp, showLogs)
+	widgets = initDisplayTviewTable(query, filters, labels, displayConfig)
 
 	// Start the display.
 	display(
@@ -251,7 +281,7 @@ func TableDisplay(query string, filters, labels []string, showHelp, showLogs boo
 }
 
 // Creates a graph of results for the results pane.
-func GraphDisplay(query string, filters, labels []string, showHelp, showLogs bool) {
+func GraphDisplay(query string, filters, labels []string, displayConfig *DisplayConfig) {
 	var (
 		err error // General error holder.
 
@@ -286,7 +316,7 @@ func GraphDisplay(query string, filters, labels []string, showHelp, showLogs boo
 			// Print all previous results.
 			for _, result := range store.GetToIndex(query, reader) {
 				// We can display the next result.
-				value := result.Values[valueIndex]
+				value := result.Values.Get(valueIndex)
 
 				switch value.(type) {
 				case int64:
@@ -307,7 +337,7 @@ func GraphDisplay(query string, filters, labels []string, showHelp, showLogs boo
 					<-pauseDisplayChan
 				default:
 					// We can display the next result.
-					value := (GetResult(query)).Values[valueIndex]
+					value := (GetResult(query)).Values.Get(valueIndex)
 
 					switch value.(type) {
 					case int64:
@@ -322,5 +352,5 @@ func GraphDisplay(query string, filters, labels []string, showHelp, showLogs boo
 
 	// Initialize the display. This must happen after the display function is invoked, otherwise data
 	// will never appear.
-	initDisplayTermdash(widgets, query, filters, labels, showHelp, showLogs)
+	initDisplayTermdash(widgets, query, filters, labels, displayConfig)
 }
