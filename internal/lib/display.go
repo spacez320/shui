@@ -17,7 +17,7 @@ import (
 type DisplayConfig struct {
 	HelpSize, LogsSize, ResultsSize                                          int  // Proportional size of widgets.
 	OuterPaddingBottom, OuterPaddingLeft, OuterPaddingRight, OuterPaddingTop int  // Padding for the full display.
-	ShowHelp, ShowLogs                                                       bool // Whether or not to show widgets.
+	ShowHelp, ShowLogs, ShowStatus                                           bool // Whether or not to show widgets.
 	TablePadding                                                             int  // Padding for table cells in table displays.
 }
 
@@ -103,6 +103,7 @@ func NewDisplayConfig() *DisplayConfig {
 		ResultsSize:        DEFAULT_RESULTS_SIZE,
 		ShowHelp:           true,
 		ShowLogs:           false,
+		ShowStatus:         true,
 		TablePadding:       DEFAULT_TABLE_PADDING,
 	}
 }

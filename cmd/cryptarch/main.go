@@ -71,8 +71,9 @@ var (
 	promExporterAddr    string     // Address for Prometheus metrics page.
 	promPushgatewayAddr string     // Address for Prometheus Pushgateway.
 	queries             queriesArg // Queries to execute.
-	showHelp            bool       // Whether or not to show help.
+	showHelp            bool       // Whether or not to show helpt
 	showLogs            bool       // Whether or not to show logs.
+	showStatus          bool       // Whether or not to show statuses.
 	silent              bool       // Whether or not to be quiet.
 
 	ctx                    = context.Background() // Initialize context.
@@ -108,6 +109,7 @@ func main() {
 	flag.BoolVar(&history, "history", true, "Whether or not to use or preserve history.")
 	flag.BoolVar(&showHelp, "show-help", true, "Whether or not to show help displays.")
 	flag.BoolVar(&showLogs, "show-logs", false, "Whether or not to show log displays.")
+	flag.BoolVar(&showStatus, "show-status", true, "Whether or not to show status displays.")
 	flag.BoolVar(&silent, "silent", false, "Don't output anything to a console.")
 	flag.IntVar(&count, "count", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "delay", 3, "Delay between queries (seconds).")
@@ -190,6 +192,7 @@ func main() {
 	// Set-up display configuration.
 	displayConfig.ShowHelp = showHelp
 	displayConfig.ShowLogs = showLogs
+	displayConfig.ShowStatus = showStatus
 	if outerPaddingBottom >= 0 {
 		displayConfig.OuterPaddingBottom = outerPaddingBottom
 	}

@@ -115,6 +115,10 @@ func initDisplayTview(
 	filters, labels []string,
 	displayConfig *DisplayConfig,
 ) {
+	var (
+		statusWidgets *tview.Flex // Container for status widgets.
+	)
+
 	widgets.filterWidget = tview.NewTextView()
 	widgets.flexBox = tview.NewFlex()
 	widgets.helpWidget = tview.NewTextView()
@@ -122,16 +126,15 @@ func initDisplayTview(
 	widgets.logsWidget = tview.NewTextView()
 	widgets.queryWidget = tview.NewTextView()
 
+	statusWidgets = tview.NewFlex().SetDirection(tview.FlexColumn).
+		AddItem(widgets.queryWidget, 0, 1, false).
+		AddItem(widgets.labelWidget, 0, 1, false).
+		AddItem(widgets.filterWidget, 0, 1, false)
+
 	// Set-up the layout and apply views.
 	widgets.flexBox = widgets.flexBox.
 		SetDirection(tview.FlexRow).
-		AddItem(
-			tview.NewFlex().SetDirection(tview.FlexColumn).
-				AddItem(widgets.queryWidget, 0, 1, false).
-				AddItem(widgets.labelWidget, 0, 1, false).
-				AddItem(widgets.filterWidget, 0, 1, false),
-			3, 0, false,
-		).
+		AddItem(statusWidgets, 3, 0, false).
 		AddItem(widgets.resultsWidget, 0, displayConfig.ResultsSize, false).
 		AddItem(widgets.helpWidget, 3, 0, false).
 		AddItem(widgets.logsWidget, 0, displayConfig.LogsSize, false)
@@ -170,6 +173,9 @@ func initDisplayTview(
 	}
 	if !displayConfig.ShowLogs {
 		widgets.flexBox.RemoveItem(widgets.logsWidget)
+	}
+	if !displayConfig.ShowStatus {
+		widgets.flexBox.RemoveItem(statusWidgets)
 	}
 
 	return
