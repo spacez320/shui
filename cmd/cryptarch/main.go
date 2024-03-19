@@ -4,9 +4,7 @@
 package main
 
 import (
-	"context"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -14,11 +12,9 @@ import (
 
 	"golang.org/x/exp/slog"
 
+	"github.com/spacez320/cryptarch"
 	"github.com/spacez320/cryptarch/internal/lib"
 )
-
-// Represents the mode value.
-type queryMode int
 
 // Queries provided as flags.
 type queriesArg []string
@@ -41,17 +37,10 @@ func (q *queriesArg) ToStrings() (q_strings []string) {
 	return
 }
 
-// Mode constants.
-const (
-	MODE_QUERY   queryMode = iota + 1 // For running in 'query' mode.
-	MODE_PROFILE                      // For running in 'profile' mode.
-	MODE_READ                         // For running in 'read' mode.
-)
-
 // Misc. constants.
 const (
-	CONFIG_FILE_DIR  = "cryptarch"
-	CONFIG_FILE_NAME = "cryptarch.yaml"
+	CONFIG_FILE_DIR  = "cryptarch"      // Directory for Cryptarch configuration.
+	CONFIG_FILE_NAME = "cryptarch.yaml" // Cryptarch configuration file.
 )
 
 var (
@@ -76,8 +65,7 @@ var (
 	showStatus          bool       // Whether or not to show statuses.
 	silent              bool       // Whether or not to be quiet.
 
-	ctx                    = context.Background() // Initialize context.
-	logger                 = log.Default()        // Logging system.
+	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
 		"debug": slog.LevelDebug,
 		"error": slog.LevelError,
@@ -86,10 +74,10 @@ var (
 	} // Log levels acceptable as a flag.
 )
 
-// Parses a comma delimited argument string, returning a slice of strings if any are found, or an
-// empty slice if not.
-func parseCommaDelimitedArg(arg string) []string {
-	if parsed := strings.Split(arg, ","); parsed[0] == "" {
+// Parses a comma delimited  string, returning a slice of strings if any are found, or an empty
+// slice if not.
+func parseCommaDelimitedStrOrEmpty(s string) []string {
+	if parsed := strings.Split(s, ","); parsed[0] == "" {
 		return []string{}
 	} else {
 		return parsed
@@ -97,14 +85,6 @@ func parseCommaDelimitedArg(arg string) []string {
 }
 
 func main() {
-	var (
-		doneQueriesChan chan bool            // Channel for tracking query completion.
-		pauseQueryChans map[string]chan bool // Channels for pausing queries.
-
-		displayConfig    = lib.NewDisplayConfig() // Configuration for display modes.
-		resultsReadyChan = make(chan bool)        // Channel for signaling results readiness.
-	)
-
 	// Define arguments.
 	flag.BoolVar(&history, "history", true, "Whether or not to use or preserve history.")
 	flag.BoolVar(&showHelp, "show-help", true, "Whether or not to show help displays.")
@@ -114,7 +94,7 @@ func main() {
 	flag.IntVar(&count, "count", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "delay", 3, "Delay between queries (seconds).")
 	flag.IntVar(&displayMode, "display", int(lib.DISPLAY_MODE_RAW), "Result mode to display.")
-	flag.IntVar(&mode, "mode", int(MODE_QUERY), "Mode to execute in.")
+	flag.IntVar(&mode, "mode", int(cryptarch.MODE_QUERY), "Mode to execute in.")
 	flag.IntVar(&outerPaddingBottom, "outer-padding-bottom", -1, "Bottom display padding.")
 	flag.IntVar(&outerPaddingLeft, "outer-padding-left", -1, "Left display padding.")
 	flag.IntVar(&outerPaddingRight, "outer-padding-right", -1, "Right display padding.")
@@ -143,53 +123,23 @@ func main() {
 		)))
 	}
 
-	// Execute the specified mode.
-	switch {
-	case mode == int(MODE_PROFILE):
-		slog.Debug("Executing in profile mode.")
-
-		doneQueriesChan, pauseQueryChans = lib.Query(
-			lib.QUERY_MODE_PROFILE,
-			count,
-			delay,
-			queries,
-			port,
-			history,
-			resultsReadyChan,
-		)
-
-		// Process mode has specific labels--ignore user provided ones.
-		ctx = context.WithValue(ctx, "labels", lib.ProfileLabels)
-	case mode == int(MODE_QUERY):
-		slog.Debug("Executing in query mode.")
-
-		doneQueriesChan, pauseQueryChans = lib.Query(
-			lib.QUERY_MODE_COMMAND,
-			count,
-			delay,
-			queries,
-			port,
-			history,
-			resultsReadyChan,
-		)
-
-		// Rely on user-defined labels.
-		ctx = context.WithValue(ctx, "labels", parseCommaDelimitedArg(labels))
-	case mode == int(MODE_READ):
-		slog.Debug("Executing in read mode.")
-
-	// FIXME Temporarily disabling read mode.
-	// 	done = lib.Read(port)
-	default:
-		slog.Error(fmt.Sprintf("Invalid mode: %d\n", mode))
-		os.Exit(1)
+	// Build general configuration.
+	config := lib.Config{
+		Count:                  count,
+		Delay:                  delay,
+		DisplayMode:            displayMode,
+		Filters:                parseCommaDelimitedStrOrEmpty(filters),
+		History:                history,
+		Labels:                 parseCommaDelimitedStrOrEmpty(labels),
+		Mode:                   mode,
+		Port:                   port,
+		PrometheusExporterAddr: promExporterAddr,
+		PushgatewayAddr:        promPushgatewayAddr,
+		Queries:                queries,
 	}
 
-	// Initialize remaining context.
-	ctx = context.WithValue(ctx, "filters", parseCommaDelimitedArg(filters))
-	ctx = context.WithValue(ctx, "queries", queries.ToStrings())
-
-	// Set-up display configuration.
+	// Build display configuration.
+	displayConfig := lib.NewDisplayConfig()
 	displayConfig.ShowHelp = showHelp
 	displayConfig.ShowLogs = showLogs
 	displayConfig.ShowStatus = showStatus
@@ -206,27 +156,5 @@ func main() {
 		displayConfig.OuterPaddingTop = outerPaddingTop
 	}
 
-	// Execute result viewing.
-	if !silent {
-		lib.Results(
-			ctx,
-			lib.DisplayMode(displayMode),
-			ctx.Value("queries").([]string)[0], // Always start with the first query.
-			history,
-			displayConfig,
-			&lib.Config{
-				LogLevel:               logLevel,
-				PrometheusExporterAddr: promExporterAddr,
-				PushgatewayAddr:        promPushgatewayAddr,
-			},
-			pauseQueryChans,
-			resultsReadyChan,
-		)
-	}
-
-	// XXX This isn't strictly necessary, mainly because getting here shouldn't be possible
-	// (`lib.Results` does not have any intentional return condition), but it's being left here in
-	// case in the future we do want to control for query completion.
-	<-doneQueriesChan
-	close(doneQueriesChan)
+	cryptarch.Run(config, *displayConfig)
 }

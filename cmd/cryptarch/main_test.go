@@ -16,7 +16,7 @@ const (
 
 var (
 	// Filepath for the Cryptarch executable.
-	cryptarch = filepath.Join(CRYPTARCH_BINARY_DIR, CRYPTARCH_BINARY_NAME)
+	cryptarchExec = filepath.Join(CRYPTARCH_BINARY_DIR, CRYPTARCH_BINARY_NAME)
 	// Environment to execute Cryptarch with, appended to `os.Environ()`.
 	testEnviron = map[string]string{
 		"GOCOVERDIR": ".coverdata",
@@ -35,7 +35,7 @@ func environToA(environ map[string]string) (a string) {
 
 // Builds the Cryptarch binary.
 func buildCryptarch() ([]byte, error) {
-	cmd := exec.Command("go", "build", "-o", cryptarch)
+	cmd := exec.Command("go", "build", "-o", cryptarchExec)
 	return cmd.CombinedOutput()
 }
 
@@ -45,7 +45,7 @@ func runCryptarch(args []string) ([]byte, error) {
 		environ = append(os.Environ(), environToA(testEnviron))
 	)
 
-	cmd := exec.Command(cryptarch, args...)
+	cmd := exec.Command(cryptarchExec, args...)
 	cmd.Env = environ
 	return cmd.CombinedOutput()
 }

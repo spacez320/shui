@@ -1,9 +1,11 @@
 //
-// Controls shared configuration settings.
+// Shared configuration settings.
 
 package lib
 
-import "golang.org/x/exp/slog"
+import (
+	"golang.org/x/exp/slog"
+)
 
 var (
 	logLevelStrtoSlogLevel = map[string]slog.Level{
@@ -14,11 +16,15 @@ var (
 	} // Mapping of human-readable log levels to Slog levels.
 )
 
-// Shareable configuration.
+// Shareable configuration. See CLI flags for further details.
 type Config struct {
-	LogLevel               string // Log level.
-	PrometheusExporterAddr string // Prometheus exporter address.
-	PushgatewayAddr        string // Pushgateway address.
+	Count, Delay, DisplayMode, Mode int
+	Filters, Labels, Queries        []string
+	History, Silent                 bool
+	LogLevel                        string
+	Port                            string
+	PrometheusExporterAddr          string
+	PushgatewayAddr                 string
 }
 
 // Retrieves an Slog level from a human-readable level string.
