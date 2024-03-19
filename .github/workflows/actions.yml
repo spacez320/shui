@@ -17,8 +17,8 @@ jobs:
           go mod tidy  # FIXME I don't know why this is necessary.
           go test
           popd
-          go test internal/*
-          go test pkg/*
+          go test internal/lib/*
+          go test pkg/storage/*
 
   release-test:
     if: ${{ !startsWith(github.ref, 'refs/tags') }}  # Only run on non-tags.
