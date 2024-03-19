@@ -220,11 +220,7 @@ func initDisplayTermdash(
 					container.BorderTitleAlignCenter(),
 					container.PlaceWidget(widgets.helpWidget),
 				),
-				// TODO This is a heuristic to make the Help pane small because termdash does not allow
-				// sizing on latter elements.
-				//
-				// See: https://github.com/mum4k/termdash/issues/292
-				container.SplitOption(container.SplitPercent(97)),
+				container.SplitOption(container.SplitFixedFromEnd(3)),
 			),
 		)
 	} else if widgets.logsWidget != nil {
