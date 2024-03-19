@@ -8,7 +8,6 @@ package lib
 import (
 	// "fmt"
 	"net/rpc"
-	// "pkg/storage"
 )
 
 var (
