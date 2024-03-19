@@ -1,4 +1,4 @@
-module cryptarch
+module github.com/spacez320/cryptarch
 
 go 1.20
 
