@@ -11,7 +11,6 @@ package lib
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -49,7 +48,8 @@ func resetContext(query string) {
 	currentCtx = context.WithValue(currentCtx, "query", query)
 }
 
-// Adds a result to the result store based on a string.
+// Adds a result to the result store based on a string. It is assumed that all processing has
+// ocurred on the result itself.
 func AddResult(query, result string, history bool) {
 	result = strings.TrimSpace(result)
 	_, err := store.Put(query, result, history, TokenizeResult(result)...)
@@ -79,7 +79,7 @@ func GetResultWait(query string) (result storage.Result) {
 }
 
 // Creates a result with filtered values.
-func FilterResult(result storage.Result, labels, filters []string) storage.Result {
+func FilterResult(result storage.Result, filters, labels []string) storage.Result {
 	var (
 		labelIndexes = make([]int, len(filters))         // Indexes of labels from filters, corresponding to result values.
 		resultValues = make([]interface{}, len(filters)) // Found result values.
@@ -187,7 +187,7 @@ func Results(
 	}
 
 	// Signals that results are ready to be received.
-	slog.Debug("Results are ready to receive.")
+	slog.Debug("Results are ready")
 	resultsReadyChan <- true
 
 	for {
@@ -214,7 +214,7 @@ func Results(
 			driver = DISPLAY_TERMDASH
 			GraphDisplay(query, filters, labels, displayConfig)
 		default:
-			slog.Error(fmt.Sprintf("Invalid result driver: %d\n", displayMode))
+			slog.Error("Invalid result driver", "displayMode", displayMode)
 			os.Exit(1)
 		}
 

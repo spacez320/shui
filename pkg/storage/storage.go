@@ -14,7 +14,6 @@ package storage
 
 import (
 	"encoding/json"
-	_ "fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -22,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	_ "golang.org/x/exp/slog"
+	"golang.org/x/exp/slog"
 )
 
 const (
@@ -238,6 +237,16 @@ func (s *Storage) Put(
 	// Initialize the result.
 	s.newResults(query, len(values))
 	result = (*s).Results[query].put(value, values...)
+
+	slog.Debug(
+		"Placing results in storage",
+		"value",
+		value,
+		"values",
+		values,
+		"labels",
+		(*s).Results[query].Labels,
+	)
 
 	// Send a non-blocking put event. Put events are lossy and clients may lose information if not
 	// actively listening.

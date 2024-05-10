@@ -4,7 +4,6 @@
 package lib
 
 import (
-	"fmt"
 	"io"
 	"os/exec"
 	"strconv"
@@ -47,18 +46,9 @@ func runQuery(
 	doneChan <- true
 }
 
-// Executes a query as a process to profile.
-func runQueryProfile(pid string, history bool) {
-	slog.Debug(fmt.Sprintf("Executing profile for PID: '%s' ...", pid))
-
-	pidInt, err := strconv.Atoi(pid)
-	e(err)
-	AddResult(pid, runProfile(pidInt), history)
-}
-
 // Executes a query as a command to exec.
 func runQueryExec(query string, history bool) {
-	slog.Debug(fmt.Sprintf("Executing query: '%s' ...", query))
+	slog.Debug("Executing query", "query", query)
 
 	// Prepare query execution.
 	cmd := exec.Command("bash", "-c", query)
@@ -77,17 +67,28 @@ func runQueryExec(query string, history bool) {
 	cmd_stderr_output, cmd_stderr_output_err := io.ReadAll(stderr)
 	e(cmd_stderr_output_err)
 	if len(cmd_stderr_output) != 0 {
-		slog.Error(fmt.Sprintf("Query '%s' error is: %s", query, cmd_stderr_output))
+		slog.Error("Query error", "query", query)
 	}
 
 	// Interpret results.
 	cmd_output, cmd_output_err := io.ReadAll(stdout)
 	e(cmd_output_err)
+
+	// Store results.
+	slog.Debug("Query success", "query", query, "result", cmd_output)
 	AddResult(query, string(cmd_output), history)
-	slog.Debug(fmt.Sprintf("Query '%s' result is: %s", query, cmd_output))
 
 	// Clean-up.
 	cmd.Wait()
+}
+
+// Executes a query as a process to profile.
+func runQueryProfile(pid string, history bool) {
+	slog.Debug("Profiling pid", "pid", pid)
+
+	pidInt, err := strconv.Atoi(pid)
+	e(err)
+	AddResult(pid, runProfile(pidInt), history)
 }
 
 // Entrypoint for 'query' mode.
@@ -114,14 +115,14 @@ func Query(
 
 	go func() {
 		// Wait for result consumption to become ready.
-		slog.Debug("Waiting for results readiness ...")
+		slog.Debug("Waiting for results readiness")
 		<-resultsReadyChan
 
 		for _, query := range queries {
 			// Execute the queries.
 			switch queryMode {
 			case QUERY_MODE_COMMAND:
-				slog.Debug("Executing in query mode command.")
+				slog.Debug("Executing in query mode command")
 				go runQuery(
 					query,
 					attempts,
@@ -132,7 +133,7 @@ func Query(
 					runQueryExec,
 				)
 			case QUERY_MODE_PROFILE:
-				slog.Debug("Executing in query mode profile.")
+				slog.Debug("Executing in query mode profile")
 				go runQuery(
 					query,
 					attempts,

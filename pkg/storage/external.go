@@ -68,7 +68,7 @@ func (p *PushgatewayStorage) Put(query string, labels []string, result Result) e
 	}
 	(*p).registry.Register(metric)
 
-	slog.Debug(fmt.Sprintf("Pushing to Pushgtateway, name: %s, result: %v ...", name, result))
+	slog.Debug("Pushing to Pushgtateway", "name", name, "result", result)
 	push.New((*p).address, PROMETHEUS_JOB).Grouping("instance", instance).Gatherer((*p).registry).Push()
 
 	return nil
@@ -94,7 +94,7 @@ func (p *PrometheusStorage) Put(query string, labels []string, result Result) er
 	}
 	(*p).registry.Register(metric)
 
-	slog.Debug(fmt.Sprintf("Pushing to Prometheus, name: %s, result: %v ...", name, result))
+	slog.Debug("Pushing to Prometheus", "name", name, "result", result)
 
 	return nil
 }

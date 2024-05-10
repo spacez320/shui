@@ -39,7 +39,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 	// Execute the specified mode.
 	switch {
 	case config.Mode == int(MODE_PROFILE):
-		slog.Debug("Executing in profile mode.")
+		slog.Debug("Executing in profile mode")
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_PROFILE,
@@ -54,7 +54,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 		// Process mode has specific labels--ignore user provided ones.
 		ctx = context.WithValue(ctx, "labels", lib.ProfileLabels)
 	case config.Mode == int(MODE_QUERY):
-		slog.Debug("Executing in query mode.")
+		slog.Debug("Executing in query mode")
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_COMMAND,
@@ -69,7 +69,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 		// Rely on user-defined labels.
 		ctx = context.WithValue(ctx, "labels", config.Labels)
 	case config.Mode == int(MODE_READ):
-		slog.Debug("Executing in read mode.")
+		slog.Debug("Executing in read mode")
 
 	// FIXME Temporarily disabling read mode.
 	// 	done = lib.Read(port)
