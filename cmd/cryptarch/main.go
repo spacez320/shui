@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -107,9 +108,17 @@ func main() {
 		"Address to present Prometheus metrics.")
 	flag.StringVar(&promPushgatewayAddr, "prometheus-pushgateway", "",
 		"Address for Prometheus Pushgateway.")
-	flag.Var(&queries, "query", "Query to execute. Can be supplied multiple times. When in query"+
-		"mode, this is expected to be some command. When in profile mode it is expected to be PID.")
+	flag.Var(&queries, "query", "Query to execute. Can be supplied multiple times. When in query "+
+		"mode, this is expected to be some command. When in profile mode it is expected to be PID. "+
+		"At least one query must be provided.")
 	flag.Parse()
+
+	// Check for required flags.
+	if len(queries) == 0 {
+		flag.Usage()
+		fmt.Fprintf(os.Stderr, "Missing required argument -query\n")
+		os.Exit(1)
+	}
 
 	// Set-up logging.
 	if silent || displayMode == int(lib.DISPLAY_MODE_GRAPH) {

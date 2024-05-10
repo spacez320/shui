@@ -1,8 +1,11 @@
 module github.com/spacez320/cryptarch
 
-go 1.20
+go 1.21
+
+toolchain go1.22.2
 
 require (
+	github.com/expr-lang/expr v1.16.7
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/mum4k/termdash v0.20.0
 	github.com/prometheus/client_golang v1.19.0
