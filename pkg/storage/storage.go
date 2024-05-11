@@ -18,6 +18,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -32,6 +33,50 @@ const (
 	STORAGE_FILE_NAME      = "storage.json" // Filename to use for actual storage.
 )
 
+// Returns a results series that has been filtered to a specific set of labels.
+func filterResult(query string, filters, labels []string, result Result) (filteredResult Result) {
+	var (
+		filteredIndexes = make([]int, len(filters))         // Indexes corresponding to filtered labels.
+		filteredValues  = make([]interface{}, len(filters)) // Values after filtering.
+	)
+
+	if len(filters) > 0 {
+		// Find indexes to pursue for results.
+		for i, filter := range filters {
+			filteredIndexes[i] = slices.Index(labels, filter)
+		}
+
+		// Filter the results.
+		filteredValues = filterSlice(result.Values, filteredIndexes)
+
+		// Reconstruct the result with filtered values.
+		filteredResult = Result{
+			Time:   result.Time,
+			Value:  result.Value,
+			Values: filteredValues,
+		}
+	} else {
+		// If not filters were provided, just return the result itself.
+		filteredResult = result
+	}
+
+	return
+}
+
+// Pick items from an arbitrary slice according to provided indexes. If indexes is empty, it will
+// just return the original slice.
+func filterSlice[T interface{}](in []T, indexes []int) (out []T) {
+	if len(indexes) == 0 {
+		out = in
+	} else {
+		for _, index := range indexes {
+			out = append(out, in[index])
+		}
+	}
+
+	return
+}
+
 // Collection of results mapped to their queries.
 type Storage struct {
 	externalStorages []externalStorage        // Integrated external storages.
@@ -42,7 +87,7 @@ type Storage struct {
 	Results map[string]*Results // Map of queries to results.
 }
 
-// initializes a new results series in storage. Must be called when a new results series is created.
+// Initializes a new results series in storage. Must be called when a new results series is created.
 // This function is idempotent in that it will check if results for a query have already been
 // initialized and pass silently if so.
 func (s *Storage) newResults(query string, size int) {
@@ -79,77 +124,6 @@ func (s *Storage) save() error {
 	return err
 }
 
-// Initializes a new storage, loading in any saved storage data.
-func NewStorage(persistence bool) (storage Storage, err error) {
-	var (
-		cryptarchUserCacheDir string              // Cryptarch specific user cache data.
-		results               map[string]*Results // Pre-built storage with existing data.
-		storageData           []byte              // Raw read storage data.
-		storageFilepath       string              // Filepath for storage.
-		storageStat           fs.FileInfo         // Stat for the storage file.
-		userCacheDir          string              // User cache directory, contextual to OS.
-	)
-
-	// Initialize storage.
-	storage = Storage{
-		Results:       make(map[string]*Results, MAX_RESULTS),
-		putEventChans: make(map[string](chan Result), MAX_RESULTS),
-		storageMutex:  &sync.Mutex{},
-	}
-
-	// If we have disabled persistence, simply return the new storage instance.
-	if !persistence {
-		return
-	}
-
-	// Retrieve the user cache directory.
-	userCacheDir, err = os.UserCacheDir()
-	if err != nil {
-		return
-	}
-
-	// Create the user cache directory for data.
-	cryptarchUserCacheDir = filepath.Join(userCacheDir, STORAGE_FILE_DIR)
-	err = os.MkdirAll(cryptarchUserCacheDir, fs.FileMode(0770))
-	if err != nil {
-		return
-	}
-
-	// Instantiate the storage file.
-	storageFilepath = filepath.Join(cryptarchUserCacheDir, STORAGE_FILE_NAME)
-	storage.storageFile, err = os.OpenFile(
-		storageFilepath,
-		os.O_CREATE|os.O_RDWR,
-		fs.FileMode(0770),
-	)
-	if err != nil {
-		return
-	}
-
-	if storageStat, err = os.Stat(storageFilepath); storageStat.Size() > 0 {
-		// There is pre-existing storage data.
-		if err != nil {
-			return
-		}
-
-		// Read in storage data and supply it to storage. We must initialize any results series before
-		// populating data.
-		storageData, err = io.ReadAll(storage.storageFile)
-		if err != nil {
-			return
-		}
-		json.Unmarshal(storageData, &results)
-
-		for query := range results {
-			// TODO Results loading should also preserve and restore actual labels.
-			storage.newResults(query, len(results[query].Results[0].Values))
-			storage.Results[query] = results[query]
-		}
-	}
-
-	return
-}
-
 // Adds an external storage.
 func (s *Storage) AddExternalStorage(e externalStorage) {
 	(*s).externalStorages = append((*s).externalStorages, e)
@@ -171,8 +145,22 @@ func (s *Storage) GetAll(query string) []Result {
 }
 
 // Get a result's labels.
-func (s *Storage) GetLabels(query string) []string {
-	return (*s).Results[query].Labels
+func (s *Storage) GetLabels(query string, filters []string) []string {
+	var (
+		filteredIndexes = make([]int, len(filters))  // Indexes for filtering.
+		labels          = (*s).Results[query].Labels // Labels associated with this query.
+	)
+
+	// Filter labels, if needed.
+	if len(filters) > 0 {
+		for i, filter := range filters {
+			filteredIndexes[i] = slices.Index(labels, filter)
+		}
+
+		labels = filterSlice(labels, filteredIndexes)
+	}
+
+	return labels
 }
 
 // Gets results based on a start and end timestamp.
@@ -181,8 +169,18 @@ func (s *Storage) GetRange(query string, startTime, endTime time.Time) []Result 
 }
 
 // Given results up to a reader index (a.k.a. "playback").
-func (s *Storage) GetToIndex(query string, index *ReaderIndex) []Result {
-	return (*s).Results[query].Results[:(*index)+1]
+func (s *Storage) GetToIndex(query string, filters []string, index *ReaderIndex) []Result {
+	var (
+		results         = (*s).Results[query].Results[:(*index)+1] // Queried results.
+		filteredResults = make([]Result, len(results))             // Results after filtering.
+		labels          = (*s).Results[query].Labels               // Labels associated with this query.
+	)
+
+	for i, result := range results {
+		filteredResults[i] = filterResult(query, filters, labels, result)
+	}
+
+	return filteredResults
 }
 
 // Given a filter, return the corresponding value index.
@@ -209,9 +207,13 @@ func (s *Storage) NewReaderIndex(query string) *ReaderIndex {
 }
 
 // Retrieve the next result from a put event channel, blocking if none exists.
-func (s *Storage) Next(query string, reader *ReaderIndex) (next Result) {
+func (s *Storage) Next(query string, filters []string, reader *ReaderIndex) (next Result) {
+	// Read from the event channel.
 	next = <-(*s).putEventChans[query]
 	reader.Inc()
+
+	// Apply filters.
+	next = filterResult(query, filters, (*s).Results[query].Labels, next)
 
 	return
 }
@@ -283,6 +285,77 @@ func (s *Storage) PutLabels(query string, labels []string) {
 // Show all currently stored results.
 func (s *Storage) Show(query string) {
 	(*s).Results[query].show()
+}
+
+// Initializes a new storage, loading in any saved storage data.
+func NewStorage(persistence bool) (storage Storage, err error) {
+	var (
+		cryptarchUserCacheDir string              // Cryptarch specific user cache data.
+		results               map[string]*Results // Pre-built storage with existing data.
+		storageData           []byte              // Raw read storage data.
+		storageFilepath       string              // Filepath for storage.
+		storageStat           fs.FileInfo         // Stat for the storage file.
+		userCacheDir          string              // User cache directory, contextual to OS.
+	)
+
+	// Initialize storage.
+	storage = Storage{
+		Results:       make(map[string]*Results, MAX_RESULTS),
+		putEventChans: make(map[string](chan Result), MAX_RESULTS),
+		storageMutex:  &sync.Mutex{},
+	}
+
+	// If we have disabled persistence, simply return the new storage instance.
+	if !persistence {
+		return
+	}
+
+	// Retrieve the user cache directory.
+	userCacheDir, err = os.UserCacheDir()
+	if err != nil {
+		return
+	}
+
+	// Create the user cache directory for data.
+	cryptarchUserCacheDir = filepath.Join(userCacheDir, STORAGE_FILE_DIR)
+	err = os.MkdirAll(cryptarchUserCacheDir, fs.FileMode(0770))
+	if err != nil {
+		return
+	}
+
+	// Instantiate the storage file.
+	storageFilepath = filepath.Join(cryptarchUserCacheDir, STORAGE_FILE_NAME)
+	storage.storageFile, err = os.OpenFile(
+		storageFilepath,
+		os.O_CREATE|os.O_RDWR,
+		fs.FileMode(0770),
+	)
+	if err != nil {
+		return
+	}
+
+	if storageStat, err = os.Stat(storageFilepath); storageStat.Size() > 0 {
+		// There is pre-existing storage data.
+		if err != nil {
+			return
+		}
+
+		// Read in storage data and supply it to storage. We must initialize any results series before
+		// populating data.
+		storageData, err = io.ReadAll(storage.storageFile)
+		if err != nil {
+			return
+		}
+		json.Unmarshal(storageData, &results)
+
+		for query := range results {
+			// TODO Results loading should also preserve and restore actual labels.
+			storage.newResults(query, len(results[query].Results[0].Values))
+			storage.Results[query] = results[query]
+		}
+	}
+
+	return
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

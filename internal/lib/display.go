@@ -11,6 +11,8 @@ import (
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/widgets/sparkline"
 	"github.com/rivo/tview"
+
+	_ "github.com/spacez320/cryptarch/pkg/storage"
 )
 
 // General configuration for display modes.
@@ -109,7 +111,7 @@ func NewDisplayConfig() *DisplayConfig {
 }
 
 // Presents raw output.
-func RawDisplay(query string) {
+func RawDisplay(query string, filters []string) {
 	var (
 		reader = readerIndexes[query] // Reader index for the query.
 	)
@@ -119,44 +121,41 @@ func RawDisplay(query string) {
 	reader.Dec()
 
 	// Load existing results.
-	for _, result := range store.GetToIndex(query, reader) {
+	for _, result := range store.GetToIndex(query, filters, reader) {
 		fmt.Println(result)
 	}
 
 	// Load new results.
 	for {
-		fmt.Println(GetResult(query))
+		fmt.Println(GetResult(query, filters))
 	}
 }
 
 // Update the results pane with new results as they are generated.
-func StreamDisplay(query string, filters, labels []string, displayConfig *DisplayConfig) {
+func StreamDisplay(query string, filters []string, displayConfig *DisplayConfig) {
 	var (
+		widgets tviewWidgets // Widgets produced by tview.
+
 		reader = readerIndexes[query] // Reader index for the query.
 	)
 
-	// ait for the first result to appear to synchronize storage.
+	// Wait for the first result to appear to synchronize storage.
 	GetResultWait(query)
 	reader.Dec()
 
 	// Initialize the display.
-	widgets := initDisplayTviewText(query, filters, labels, displayConfig)
+	widgets = initDisplayTviewText(query, filters, store.GetLabels(query, []string{}), displayConfig)
 
 	// Start the display.
 	display(
 		DISPLAY_TVIEW,
 		func() {
-			// Print labels as the first line.
-			appTview.QueueUpdateDraw(func() {
-				fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), labels)
-			})
-
-			// Print all previous results.
-			for _, result := range store.GetToIndex(query, reader) {
-				fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), result.Value)
+			// Load existing results.
+			for _, result := range store.GetToIndex(query, filters, reader) {
+				fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), result.Values)
 			}
 
-			// Print results.
+			// Load new results.
 			for {
 				// Listen for an interrupt to stop result consumption for some display change.
 				select {
@@ -168,7 +167,7 @@ func StreamDisplay(query string, filters, labels []string, displayConfig *Displa
 					<-pauseDisplayChan
 				default:
 					// We can display the next result.
-					fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), (GetResult(query)).Value)
+					fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), GetResult(query, filters).Values)
 				}
 			}
 		},
@@ -176,13 +175,23 @@ func StreamDisplay(query string, filters, labels []string, displayConfig *Displa
 }
 
 // Creates a table of results for the results pane.
-func TableDisplay(query string, filters, labels []string, displayConfig *DisplayConfig) {
+func TableDisplay(query string, filters []string, displayConfig *DisplayConfig) {
 	var (
 		widgets tviewWidgets // Widgets produced by tview.
 
+		cellContentParser = func(value interface{}) (cellContent string) {
+			switch value.(type) {
+			case int64:
+				cellContent = strconv.FormatInt(value.(int64), 10)
+			case float64:
+				cellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
+			default:
+				cellContent = value.(string)
+			}
+			return
+		} // Parses results for displaying in table cells.
 		reader           = readerIndexes[query]                            // Reader index for the query.
 		tableCellPadding = strings.Repeat(" ", displayConfig.TablePadding) // Padding to add to table cell content.
-		valueIndexes     = []int{}                                         // Indexes of the result values to add to the table.
 	)
 
 	// Wait for the first result to appear to synchronize storage.
@@ -190,60 +199,47 @@ func TableDisplay(query string, filters, labels []string, displayConfig *Display
 	reader.Dec()
 
 	// Initialize the display.
-	widgets = initDisplayTviewTable(query, filters, labels, displayConfig)
+	widgets = initDisplayTviewTable(query, filters, store.GetLabels(query, []string{}), displayConfig)
 
 	// Start the display.
 	display(
 		DISPLAY_TVIEW,
 		func() {
-			var (
-				nextCellContent string // Next cell to add to the table.
+			i := 0 // Used to determine the next row index.
 
-				i = 0 // Used to determine the next row index.
-			)
+			// TODO Need to determine if this is still needed when supplying no labels.
+			// // Determine the value indexes to populate into the graph. If no filter is provided, the index
+			// // is assumed to be zero.
+			// if len(filters) > 0 {
+			// 	for _, filter := range filters {
+			// 		valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
+			// 	}
+			// }
 
-			// Determine the value indexes to populate into the graph. If no filter is provided, the index
-			// is assumed to be zero.
-			if len(filters) > 0 {
-				for _, filter := range filters {
-					valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
-				}
-			}
-
+			// Load table header.
 			appTview.QueueUpdateDraw(func() {
 				// Row to contain the labels.
 				headerRow := widgets.resultsWidget.(*tview.Table).InsertRow(i)
 
-				for j, label := range FilterSlice(labels, valueIndexes) {
+				for j, label := range store.GetLabels(query, filters) {
 					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
 				}
 			})
 			i += 1
 
-			// Print all previous results.
-			for _, result := range store.GetToIndex(query, reader) {
+			// Load existing results.
+			for _, result := range store.GetToIndex(query, filters, reader) {
 				appTview.QueueUpdateDraw(func() {
-					var (
-						row = widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
-					)
+					row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
 
-					for j, value := range FilterSlice(result.Values, valueIndexes) {
-						// Extrapolate the field types in order to print them out.
-						switch value.(type) {
-						case int64:
-							nextCellContent = strconv.FormatInt(value.(int64), 10)
-						case float64:
-							nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
-						default:
-							nextCellContent = value.(string)
-						}
-						row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
+					for j, value := range result.Values {
+						row.SetCellSimple(i, j, tableCellPadding+cellContentParser(value)+tableCellPadding)
 					}
 				})
 				i += 1
 			}
 
-			// Print results.
+			// Load new results.
 			for {
 				// Listen for an interrupt to stop result consumption for some display change.
 				select {
@@ -256,21 +252,10 @@ func TableDisplay(query string, filters, labels []string, displayConfig *Display
 				default:
 					// We can display the next result.
 					appTview.QueueUpdateDraw(func() {
-						var (
-							row = widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
-						)
+						row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
 
-						for j, value := range FilterSlice((GetResult(query)).Values, valueIndexes) {
-							// Extrapolate the field types in order to print them out.
-							switch value.(type) {
-							case int64:
-								nextCellContent = strconv.FormatInt(value.(int64), 10)
-							case float64:
-								nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
-							default:
-								nextCellContent = value.(string)
-							}
-							row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
+						for j, value := range GetResult(query, filters).Values {
+							row.SetCellSimple(i, j, tableCellPadding+cellContentParser(value)+tableCellPadding)
 						}
 					})
 					i += 1
@@ -281,10 +266,19 @@ func TableDisplay(query string, filters, labels []string, displayConfig *Display
 }
 
 // Creates a graph of results for the results pane.
-func GraphDisplay(query string, filters, labels []string, displayConfig *DisplayConfig) {
+func GraphDisplay(query string, filter string, displayConfig *DisplayConfig) {
 	var (
 		err error // General error holder.
 
+		sparkParser = func(value interface{}) (spark []int) {
+			switch value.(type) {
+			case int64:
+				spark = []int{int(value.(int64))}
+			case float64:
+				spark = []int{int(value.(float64))}
+			}
+			return
+		} // Parses results for displaying in table cells.
 		reader     = readerIndexes[query] // Reader index for the query.
 		valueIndex = 0                    // Index of the result value to graph.
 		widgets    = termdashWidgets{}    // Widgets for displaying.
@@ -295,8 +289,9 @@ func GraphDisplay(query string, filters, labels []string, displayConfig *Display
 	reader.Dec()
 
 	// Determine the values to populate into the graph. If none is provided, the first value is taken.
-	if len(filters) > 0 {
-		valueIndex = store.GetValueIndex(query, filters[0])
+	// Only one filter may be provided.
+	if filter != "" {
+		valueIndex = store.GetValueIndex(query, filter)
 	}
 
 	// Initialize the results view.
@@ -304,7 +299,7 @@ func GraphDisplay(query string, filters, labels []string, displayConfig *Display
 	// XXX This should probably moved into `display_termdash.go` once termdash is managing more types
 	// of result displays.
 	widgets.resultsWidget, err = sparkline.New(
-		sparkline.Label(labels[valueIndex]),
+		sparkline.Label(store.GetLabels(query, []string{})[valueIndex]),
 		sparkline.Color(cell.ColorGreen),
 	)
 	e(err)
@@ -313,19 +308,12 @@ func GraphDisplay(query string, filters, labels []string, displayConfig *Display
 	display(
 		DISPLAY_TERMDASH,
 		func() {
-			// Print all previous results.
-			for _, result := range store.GetToIndex(query, reader) {
-				// We can display the next result.
-				value := result.Values.Get(valueIndex)
-
-				switch value.(type) {
-				case int64:
-					widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(int64))})
-				case float64:
-					widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(float64))})
-				}
+			// Load existing results.
+			for _, result := range store.GetToIndex(query, []string{filter}, reader) {
+				widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(result.Values[0]))
 			}
 
+			// Load new results.
 			for {
 				// Listen for an interrupt to stop result consumption for some display change.
 				select {
@@ -337,14 +325,8 @@ func GraphDisplay(query string, filters, labels []string, displayConfig *Display
 					<-pauseDisplayChan
 				default:
 					// We can display the next result.
-					value := (GetResult(query)).Values.Get(valueIndex)
-
-					switch value.(type) {
-					case int64:
-						widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(int64))})
-					case float64:
-						widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(float64))})
-					}
+					value := GetResult(query, []string{filter}).Values[0]
+					widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
 				}
 			}
 		},
@@ -352,5 +334,11 @@ func GraphDisplay(query string, filters, labels []string, displayConfig *Display
 
 	// Initialize the display. This must happen after the display function is invoked, otherwise data
 	// will never appear.
-	initDisplayTermdash(widgets, query, filters, labels, displayConfig)
+	initDisplayTermdash(
+		widgets,
+		query,
+		[]string{filter},
+		store.GetLabels(query, []string{filter}),
+		displayConfig,
+	)
 }

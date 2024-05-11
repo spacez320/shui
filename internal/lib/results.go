@@ -57,8 +57,8 @@ func AddResult(query, result string, history bool) {
 }
 
 // Retrieves a next result.
-func GetResult(query string) storage.Result {
-	return store.Next(query, readerIndexes[query])
+func GetResult(query string, filters []string) storage.Result {
+	return store.Next(query, filters, readerIndexes[query])
 }
 
 // Retrieves a next result, waiting for a non-empty return in a non-blocking manner.
@@ -84,6 +84,8 @@ func FilterResult(result storage.Result, filters, labels []string) storage.Resul
 		labelIndexes = make([]int, len(filters))         // Indexes of labels from filters, corresponding to result values.
 		resultValues = make([]interface{}, len(filters)) // Found result values.
 	)
+
+	slog.Debug("Filtering result", "result", result, "filters", filters, "labels", labels)
 
 	// Find indexes to pursue for results.
 	for i, filter := range filters {
@@ -203,16 +205,23 @@ func Results(
 		switch displayMode {
 		case DISPLAY_MODE_RAW:
 			driver = DISPLAY_RAW
-			RawDisplay(query)
+			RawDisplay(query, filters)
 		case DISPLAY_MODE_STREAM:
 			driver = DISPLAY_TVIEW
-			StreamDisplay(query, filters, labels, displayConfig)
+			StreamDisplay(query, filters, displayConfig)
 		case DISPLAY_MODE_TABLE:
 			driver = DISPLAY_TVIEW
-			TableDisplay(query, filters, labels, displayConfig)
+			TableDisplay(query, filters, displayConfig)
 		case DISPLAY_MODE_GRAPH:
+			if len(filters) == 0 {
+				slog.Error("Graph mode requires a filter")
+				os.Exit(1)
+			}
+			if len(filters) > 1 {
+				slog.Warn("Graph mode can only apply one filter; ignoring all but the first")
+			}
 			driver = DISPLAY_TERMDASH
-			GraphDisplay(query, filters, labels, displayConfig)
+			GraphDisplay(query, filters[0], displayConfig)
 		default:
 			slog.Error("Invalid result driver", "displayMode", displayMode)
 			os.Exit(1)
