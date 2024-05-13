@@ -207,15 +207,6 @@ func TableDisplay(query string, filters []string, displayConfig *DisplayConfig) 
 		func() {
 			i := 0 // Used to determine the next row index.
 
-			// TODO Need to determine if this is still needed when supplying no labels.
-			// // Determine the value indexes to populate into the graph. If no filter is provided, the index
-			// // is assumed to be zero.
-			// if len(filters) > 0 {
-			// 	for _, filter := range filters {
-			// 		valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
-			// 	}
-			// }
-
 			// Load table header.
 			appTview.QueueUpdateDraw(func() {
 				// Row to contain the labels.
