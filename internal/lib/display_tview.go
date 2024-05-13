@@ -10,6 +10,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	slogmulti "github.com/samber/slog-multi"
 )
 
 // Widgets for tview displays.
@@ -116,7 +117,8 @@ func initDisplayTview(
 	displayConfig *DisplayConfig,
 ) {
 	var (
-		statusWidgets *tview.Flex // Container for status widgets.
+		logsWidgetHandler slog.Handler // Log handler for Tview apps.
+		statusWidgets     *tview.Flex  // Container for status widgets.
 	)
 
 	widgets.filterWidget = tview.NewTextView()
@@ -162,10 +164,19 @@ func initDisplayTview(
 	// Initialize the logs view.
 	widgets.logsWidget.SetScrollable(false).SetChangedFunc(func() { appTview.Draw() })
 	widgets.logsWidget.SetBorder(true).SetTitle("Logs")
-	slog.SetDefault(slog.New(slog.NewTextHandler(
+
+	// Define a logging sink for Tview apps.
+	logsWidgetHandler = slog.NewTextHandler(
 		widgets.logsWidget,
 		&slog.HandlerOptions{Level: config.SlogLogLevel()},
-	)))
+	)
+	if config.LogMulti {
+		// We need to preserve the existing log stream.
+		slog.SetDefault(slog.New(slogmulti.Fanout(slog.Default().Handler(), logsWidgetHandler)))
+	} else {
+		// We should only log to the widget.
+		slog.SetDefault(slog.New(logsWidgetHandler))
+	}
 
 	// Hide displays we don't want to show.
 	if !displayConfig.ShowHelp {

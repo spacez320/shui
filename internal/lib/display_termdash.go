@@ -16,6 +16,7 @@ import (
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgetapi"
 	"github.com/mum4k/termdash/widgets/text"
+	slogmulti "github.com/samber/slog-multi"
 )
 
 // Used to provide an io.Writer implementation of termdash text widgets.
@@ -93,11 +94,12 @@ func initDisplayTermdash(
 	displayConfig *DisplayConfig,
 ) {
 	var (
-		ctx              context.Context      // Termdash specific context.
-		err              error                // General error holder.
-		logsWidgetWriter termdashTextWriter   // Writer implementation for logs.
-		mainWidgets      []container.Option   // Status and result widgets.
-		widgetContainer  *container.Container // Wrapper for widgets.
+		ctx               context.Context      // Termdash specific context.
+		err               error                // General error holder.
+		logsWidgetWriter  termdashTextWriter   // Writer implementation for logs.
+		logsWidgetHandler slog.Handler         // Log handler for Termdash apps.
+		mainWidgets       []container.Option   // Status and result widgets.
+		widgetContainer   *container.Container // Wrapper for widgets.
 	)
 	widgets.filterWidget, err = text.New()
 	e(err)
@@ -259,11 +261,19 @@ func initDisplayTermdash(
 	e(err)
 
 	if widgets.logsWidget != nil {
+		// Define a logging sink for Termdash apps.
 		logsWidgetWriter = termdashTextWriter{text: *widgets.logsWidget}
-		slog.SetDefault(slog.New(slog.NewTextHandler(
+		logsWidgetHandler = slog.NewTextHandler(
 			&logsWidgetWriter,
 			&slog.HandlerOptions{Level: config.SlogLogLevel()},
-		)))
+		)
+		if config.LogMulti {
+			// We need to preserve the existing log stream.
+			slog.SetDefault(slog.New(slogmulti.Fanout(slog.Default().Handler(), logsWidgetHandler)))
+		} else {
+			// We should only log to the widget.
+			slog.SetDefault(slog.New(logsWidgetHandler))
+		}
 	}
 	// slog.Info("This is a test?")
 

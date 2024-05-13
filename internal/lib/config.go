@@ -18,7 +18,7 @@ var (
 type Config struct {
 	Count, Delay, DisplayMode, Mode int
 	Filters, Labels, Queries        []string
-	History, Silent                 bool
+	History, LogMulti, Silent       bool
 	LogLevel                        string
 	Port                            string
 	PrometheusExporterAddr          string

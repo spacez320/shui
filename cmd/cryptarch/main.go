@@ -155,6 +155,7 @@ func main() {
 		Labels:                 parseCommaDelimitedStrOrEmpty(labels),
 		LogLevel:               logLevel,
 		Mode:                   mode,
+		LogMulti:               logFile != "",
 		Port:                   port,
 		PrometheusExporterAddr: promExporterAddr,
 		PushgatewayAddr:        promPushgatewayAddr,
