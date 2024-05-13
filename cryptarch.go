@@ -35,6 +35,8 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 
 		resultsReadyChan = make(chan bool) // Channel for signaling results readiness.
 	)
+	slog.Debug("Running with config", "config", config)
+	slog.Debug("Running with display config", "displayConfig", displayConfig)
 
 	// Execute the specified mode.
 	switch {
@@ -90,11 +92,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			config.History,
 			&displayConfig,
-			&lib.Config{
-				LogLevel:               config.LogLevel,
-				PrometheusExporterAddr: config.PrometheusExporterAddr,
-				PushgatewayAddr:        config.PushgatewayAddr,
-			},
+			&config,
 			pauseQueryChans,
 			resultsReadyChan,
 		)

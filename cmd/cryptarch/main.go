@@ -121,7 +121,7 @@ func main() {
 	}
 
 	// Set-up logging.
-	if silent || displayMode == int(lib.DISPLAY_MODE_GRAPH) {
+	if silent {
 		// Silence all output.
 		logger.SetOutput(io.Discard)
 	} else {
@@ -140,6 +140,7 @@ func main() {
 		Filters:                parseCommaDelimitedStrOrEmpty(filters),
 		History:                history,
 		Labels:                 parseCommaDelimitedStrOrEmpty(labels),
+		LogLevel:               logLevel,
 		Mode:                   mode,
 		Port:                   port,
 		PrometheusExporterAddr: promExporterAddr,
