@@ -21,7 +21,7 @@ import (
 
 // Used to provide an io.Writer implementation of termdash text widgets.
 type termdashTextWriter struct {
-	text text.Text
+	text *text.Text
 }
 
 // Implements io.Writer.
@@ -115,7 +115,7 @@ func initDisplayTermdash(
 		widgets.helpWidget.Write(HELP_TEXT)
 	}
 	if displayConfig.ShowLogs {
-		widgets.logsWidget, err = text.New()
+		widgets.logsWidget, err = text.New(text.RollContent())
 		e(err)
 	}
 
@@ -239,7 +239,7 @@ func initDisplayTermdash(
 					container.Border(linestyle.Light),
 					container.BorderTitle("Logs"),
 					container.BorderTitleAlignCenter(),
-					container.PlaceWidget(&logsWidgetWriter.text),
+					container.PlaceWidget(logsWidgetWriter.text),
 				),
 				// XXX The -1 is to try to match tview's proportions.
 				container.SplitOption(
@@ -262,7 +262,7 @@ func initDisplayTermdash(
 
 	if widgets.logsWidget != nil {
 		// Define a logging sink for Termdash apps.
-		logsWidgetWriter = termdashTextWriter{text: *widgets.logsWidget}
+		logsWidgetWriter = termdashTextWriter{text: widgets.logsWidget}
 		logsWidgetHandler = slog.NewTextHandler(
 			&logsWidgetWriter,
 			&slog.HandlerOptions{Level: config.SlogLogLevel()},
@@ -275,7 +275,6 @@ func initDisplayTermdash(
 			slog.SetDefault(slog.New(logsWidgetHandler))
 		}
 	}
-	// slog.Info("This is a test?")
 
 	// Initialize the top-line status widgets.
 	widgets.queryWidget.Write(query)
