@@ -51,6 +51,7 @@ var (
 	filters             string     // Result filters.
 	history             bool       // Whether or not to preserve or use historical results.
 	labels              string     // Result value labels.
+	logFile             string     // Log filte to write to.
 	logLevel            string     // Log level.
 	mode                int        // Mode to execute in.
 	outerPaddingBottom  int        // Bottom padding settings.
@@ -102,6 +103,7 @@ func main() {
 	flag.IntVar(&outerPaddingTop, "outer-padding-top", -1, "Top display padding.")
 	flag.StringVar(&filters, "filters", "", "Results filters.")
 	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
+	flag.StringVar(&logFile, "log-file", "", "Log file to write to.")
 	flag.StringVar(&logLevel, "log-level", "error", "Log level.")
 	flag.StringVar(&port, "rpc-port", "12345", "Port for RPC.")
 	flag.StringVar(&promExporterAddr, "prometheus-exporter", "",
@@ -124,6 +126,17 @@ func main() {
 	if silent {
 		// Silence all output.
 		logger.SetOutput(io.Discard)
+	} else if logFile != "" {
+		// Write logs to a file.
+		logF, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+		if err != nil {
+			panic(err)
+		}
+		defer logF.Close()
+		slog.SetDefault(slog.New(slog.NewTextHandler(
+			logF,
+			&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+		)))
 	} else {
 		// Set the default to be standard error--result modes may change this.
 		slog.SetDefault(slog.New(slog.NewTextHandler(

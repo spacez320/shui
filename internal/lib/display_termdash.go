@@ -25,8 +25,8 @@ type termdashTextWriter struct {
 
 // Implements io.Writer.
 func (t *termdashTextWriter) Write(p []byte) (n int, err error) {
-	t.text.Write(string(p))
-	return len(p), nil
+	err = t.text.Write(string(p))
+	return len(p), err
 }
 
 // Used to supply optional widgets to Termdash initialization.
@@ -224,13 +224,7 @@ func initDisplayTermdash(
 			),
 		)
 	} else if widgets.logsWidget != nil {
-		// We have just the logs widget enabled. We also need to point logs to it.
-		logsWidgetWriter = termdashTextWriter{text: *widgets.logsWidget}
-		slog.SetDefault(slog.New(slog.NewTextHandler(
-			&logsWidgetWriter,
-			&slog.HandlerOptions{Level: config.SlogLogLevel()},
-		)))
-
+		// We have just the logs widget enabled.
 		widgetContainer, err = container.New(
 			appTermdash,
 			container.PaddingBottom(displayConfig.OuterPaddingBottom),
@@ -263,6 +257,15 @@ func initDisplayTermdash(
 		widgetContainer.Update("main", mainWidgets...)
 	}
 	e(err)
+
+	if widgets.logsWidget != nil {
+		logsWidgetWriter = termdashTextWriter{text: *widgets.logsWidget}
+		slog.SetDefault(slog.New(slog.NewTextHandler(
+			&logsWidgetWriter,
+			&slog.HandlerOptions{Level: config.SlogLogLevel()},
+		)))
+	}
+	// slog.Info("This is a test?")
 
 	// Initialize the top-line status widgets.
 	widgets.queryWidget.Write(query)
