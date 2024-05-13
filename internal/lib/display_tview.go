@@ -6,10 +6,10 @@ package lib
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
-	"golang.org/x/exp/slog"
 )
 
 // Widgets for tview displays.

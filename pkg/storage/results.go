@@ -5,12 +5,12 @@ package storage
 
 import (
 	"fmt"
+	_ "log/slog"
 	"reflect"
 	"strconv"
 	"time"
 
 	"golang.org/x/exp/slices"
-	_ "golang.org/x/exp/slog"
 )
 
 // Tokenized result value.

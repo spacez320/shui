@@ -16,13 +16,12 @@ import (
 	"encoding/json"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/slog"
 )
 
 const (

@@ -3,9 +3,7 @@
 
 package lib
 
-import (
-	"golang.org/x/exp/slog"
-)
+import "log/slog"
 
 var (
 	logLevelStrtoSlogLevel = map[string]slog.Level{

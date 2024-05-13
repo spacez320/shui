@@ -6,6 +6,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/mum4k/termdash"
 	"github.com/mum4k/termdash/container"
@@ -15,7 +16,6 @@ import (
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgetapi"
 	"github.com/mum4k/termdash/widgets/text"
-	"golang.org/x/exp/slog"
 )
 
 // Used to provide an io.Writer implementation of termdash text widgets.

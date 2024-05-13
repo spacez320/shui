@@ -5,11 +5,10 @@ package lib
 
 import (
 	"io"
+	"log/slog"
 	"os/exec"
 	"strconv"
 	"time"
-
-	"golang.org/x/exp/slog"
 )
 
 const (

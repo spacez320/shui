@@ -8,10 +8,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/spacez320/cryptarch"
 	"github.com/spacez320/cryptarch/internal/lib"
@@ -133,14 +132,15 @@ func main() {
 			panic(err)
 		}
 		defer logF.Close()
-		slog.SetDefault(slog.New(slog.NewTextHandler(
-			logF,
-			&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
-		)))
+		slog.SetDefault(slog.New(
+			slog.NewTextHandler(
+				logF,
+				&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+			)))
 	} else {
-		// Set the default to be standard error--result modes may change this.
+		// Set the default to be standard output--result modes may change this.
 		slog.SetDefault(slog.New(slog.NewTextHandler(
-			os.Stderr,
+			os.Stdout,
 			&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
 		)))
 	}

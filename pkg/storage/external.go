@@ -5,6 +5,7 @@ package storage
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"regexp"
@@ -13,7 +14,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
-	"golang.org/x/exp/slog"
 )
 
 const (

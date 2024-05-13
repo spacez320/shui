@@ -6,9 +6,8 @@ package cryptarch
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/spacez320/cryptarch/internal/lib"
 )

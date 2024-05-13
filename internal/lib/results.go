@@ -11,6 +11,7 @@ package lib
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -19,7 +20,6 @@ import (
 	"unicode"
 
 	"golang.org/x/exp/slices"
-	"golang.org/x/exp/slog"
 
 	"github.com/spacez320/cryptarch/pkg/storage"
 )
