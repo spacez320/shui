@@ -42,6 +42,66 @@ var (
 	pauseDisplayChan = make(chan bool) // Channel for dealing with 'pause' events for the display.
 )
 
+// Executes an expression on a result and returns a new result.
+//
+// TODO Currently this compiles expressions on the fly and constructs a result object on every
+// iteration. In the future, it might be important from a performance perspective to pre-compile
+// expressions and avoid constructing results before it's necessary.
+func exprResult(query, expression string, result storage.Result) (exprResult storage.Result) {
+	var (
+		env     map[string]interface{} // Environment to provide for an expression.
+		err     error                  // General error holder.
+		output  interface{}            // Output from an expression.
+		program *vm.Program            // Expression executable.
+	)
+
+	env = map[string]interface{}{
+		"result": result.Map(store.GetLabels(query, []string{})),
+	}
+	slog.Debug("Expr result", "query", query, "result", result, "expression", expression)
+	slog.Debug("Expr end", "env", env)
+
+	// Execute any expression.
+	program, err = expr.Compile(expression, expr.Env(env))
+	if err != nil {
+		e(err)
+	}
+	output, err = expr.Run(program, env)
+	if env != nil {
+		e(err)
+	}
+
+	// Re-define result based on the expression output.
+	switch output.(type) {
+	case int:
+		exprResult = storage.Result{
+			Time:   result.Time,
+			Value:  strconv.Itoa(output.(int)),
+			Values: storage.Values{strconv.Itoa(output.(int))},
+		}
+	case int64:
+		exprResult = storage.Result{
+			Time:   result.Time,
+			Value:  strconv.FormatInt(output.(int64), 10),
+			Values: storage.Values{strconv.FormatInt(output.(int64), 10)},
+		}
+	case float64:
+		exprResult = storage.Result{
+			Time:   result.Time,
+			Value:  strconv.FormatFloat(output.(float64), 'f', -1, 64),
+			Values: storage.Values{strconv.FormatFloat(output.(float64), 'f', -1, 64)},
+		}
+	default:
+		exprResult = storage.Result{
+			Time:   result.Time,
+			Value:  output.(string),
+			Values: storage.Values{output.(string)},
+		}
+	}
+
+	return
+}
+
 // Resets the current context to its default values.
 func resetContext(query string) {
 	for k, v := range ctxDefaults {
@@ -58,68 +118,33 @@ func AddResult(query, result string, history bool) {
 	e(err)
 }
 
+// Get results previous to the last read result.
+func GetPrevResults(query string, filters, expressions []string) (results []storage.Result) {
+	slog.Debug("Fetching previous results", "query", query)
+
+	// Retrieve previous results.
+	results = store.GetToIndex(query, filters, readerIndexes[query])
+
+	// Process any expressions on the result.
+	for i, _ := range results {
+		for _, expression := range expressions {
+			results[i] = exprResult(query, expression, results[i])
+		}
+	}
+
+	return
+}
+
 // Retrieves a next result.
 func GetResult(query string, filters, expressions []string) (result storage.Result) {
-	var (
-		env     map[string]interface{} // Environment to provide for an expression.
-		err     error                  // General error holder.
-		output  interface{}            // Output from an expression.
-		program *vm.Program            // Expression executable.
-	)
-
-	slog.Debug("Fetching next result")
+	slog.Debug("Fetching next result", "query", query)
 
 	// Retrieve the next result.
 	result = store.Next(query, filters, readerIndexes[query])
 
 	// Process any expressions on the result.
-	//
-	// TODO Currently this compiles expressions on the fly and constructs a result object on every
-	// iteration. In the future, it might be important from a performance perspective to pre-compile
-	// expressions and avoid constructing results before it's necessary.
 	for _, expression := range expressions {
-		env = map[string]interface{}{
-			"result": result.Map(store.GetLabels(query, []string{})),
-		}
-		slog.Debug("Applying expression with env", "env", env)
-
-		// Execute any expression.
-		program, err = expr.Compile(expression, expr.Env(env))
-		if err != nil {
-			e(err)
-		}
-		output, err = expr.Run(program, env)
-		if env != nil {
-			e(err)
-		}
-
-		// Re-define result based on the expression output.
-		switch output.(type) {
-		case int:
-			result = storage.Result{
-				Time:   result.Time,
-				Value:  strconv.Itoa(output.(int)),
-				Values: storage.Values{strconv.Itoa(output.(int))},
-			}
-		case int64:
-			result = storage.Result{
-				Time:   result.Time,
-				Value:  strconv.FormatInt(output.(int64), 10),
-				Values: storage.Values{strconv.FormatInt(output.(int64), 10)},
-			}
-		case float64:
-			result = storage.Result{
-				Time:   result.Time,
-				Value:  strconv.FormatFloat(output.(float64), 'f', -1, 64),
-				Values: storage.Values{strconv.FormatFloat(output.(float64), 'f', -1, 64)},
-			}
-		default:
-			result = storage.Result{
-				Time:   result.Time,
-				Value:  output.(string),
-				Values: storage.Values{output.(string)},
-			}
-		}
+		result = exprResult(query, expression, result)
 	}
 
 	return

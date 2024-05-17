@@ -180,6 +180,7 @@ func StreamDisplay(query string, filters []string, displayConfig *DisplayConfig)
 // Creates a table of results for the results pane.
 func TableDisplay(query string, filters, expressions []string, displayConfig *DisplayConfig) {
 	var (
+		labels  []string     // Labels to use for display.
 		widgets tviewWidgets // Widgets produced by tview.
 
 		cellContentParser = func(value interface{}) (cellContent string) {
@@ -201,6 +202,16 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 	GetResultWait(query)
 	reader.Dec()
 
+	// Determine labels to display, based on the presence of expressions. Expressions always map to a
+	// single variable.
+	if len(expressions) > 0 {
+		// Expressions provide single-value results--apply a generic label.
+		labels = []string{"results"}
+	} else {
+		// Get all labels.
+		labels = store.GetLabels(query, filters)
+	}
+
 	// Initialize the display.
 	widgets = initDisplayTviewTable(query, filters, store.GetLabels(query, []string{}), displayConfig)
 
@@ -214,18 +225,16 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 			appTview.QueueUpdateDraw(func() {
 				// Row to contain the labels.
 				headerRow := widgets.resultsWidget.(*tview.Table).InsertRow(i)
-
-				for j, label := range store.GetLabels(query, filters) {
+				for j, label := range labels {
 					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
 				}
 			})
 			i += 1
 
 			// Load existing results.
-			for _, result := range store.GetToIndex(query, filters, reader) {
+			for _, result := range GetPrevResults(query, filters, expressions) {
 				appTview.QueueUpdateDraw(func() {
 					row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
-
 					for j, value := range result.Values {
 						row.SetCellSimple(i, j, tableCellPadding+cellContentParser(value)+tableCellPadding)
 					}
@@ -247,7 +256,6 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 					// We can display the next result.
 					appTview.QueueUpdateDraw(func() {
 						row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
-
 						for j, value := range GetResult(query, filters, expressions).Values {
 							row.SetCellSimple(i, j, tableCellPadding+cellContentParser(value)+tableCellPadding)
 						}
