@@ -59,7 +59,7 @@ func AddResult(query, result string, history bool) {
 }
 
 // Retrieves a next result.
-func GetResult(query string, filters []string, expression string) (result storage.Result) {
+func GetResult(query string, filters, expressions []string) (result storage.Result) {
 	var (
 		env     map[string]interface{} // Environment to provide for an expression.
 		err     error                  // General error holder.
@@ -72,8 +72,12 @@ func GetResult(query string, filters []string, expression string) (result storag
 	// Retrieve the next result.
 	result = store.Next(query, filters, readerIndexes[query])
 
-	if expression != "" {
-		// Process any expression on the result.
+	// Process any expressions on the result.
+	//
+	// TODO Currently this compiles expressions on the fly and constructs a result object on every
+	// iteration. In the future, it might be important from a performance perspective to pre-compile
+	// expressions and avoid constructing results before it's necessary.
+	for _, expression := range expressions {
 		env = map[string]interface{}{
 			"result": result.Map(store.GetLabels(query, []string{})),
 		}
