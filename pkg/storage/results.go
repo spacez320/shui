@@ -34,6 +34,21 @@ type Result struct {
 	Values Values    // Tokenized value of the result.
 }
 
+// Determines whether this is an empty result.
+func (r *Result) IsEmpty() bool {
+	return reflect.DeepEqual(*r, Result{})
+}
+
+// Returns a map of values keyed to their labels.
+func (r *Result) Map(labels []string) map[string]interface{} {
+	resultMap := make(map[string]interface{}, len(r.Values))
+	for i, value := range r.Values {
+		resultMap[labels[i]] = value
+	}
+
+	return resultMap
+}
+
 // Collection of results.
 type Results struct {
 	// Meta field for result values acting as a name, corresponding by index. In the event that no
@@ -96,11 +111,6 @@ func (r *Results) show() {
 		fmt.Printf("Label: %v, Time: %v, Value: %v, Values: %v\n",
 			(*r).Labels, result.Time, result.Value, result.Values)
 	}
-}
-
-// Determines whether this is an empty result.
-func (r *Result) IsEmpty() bool {
-	return reflect.DeepEqual(*r, Result{})
 }
 
 // Creates new results.
