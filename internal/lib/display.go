@@ -127,7 +127,7 @@ func RawDisplay(query string, filters []string) {
 
 	// Load new results.
 	for {
-		fmt.Println(GetResult(query, filters))
+		fmt.Println(GetResult(query, filters, ""))
 	}
 }
 
@@ -167,7 +167,7 @@ func StreamDisplay(query string, filters []string, displayConfig *DisplayConfig)
 					<-pauseDisplayChan
 				default:
 					// We can display the next result.
-					fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), GetResult(query, filters).Values)
+					fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), GetResult(query, filters, "").Values)
 				}
 			}
 		},
@@ -175,7 +175,7 @@ func StreamDisplay(query string, filters []string, displayConfig *DisplayConfig)
 }
 
 // Creates a table of results for the results pane.
-func TableDisplay(query string, filters []string, displayConfig *DisplayConfig) {
+func TableDisplay(query string, filters, expressions []string, displayConfig *DisplayConfig) {
 	var (
 		widgets tviewWidgets // Widgets produced by tview.
 
@@ -245,7 +245,7 @@ func TableDisplay(query string, filters []string, displayConfig *DisplayConfig) 
 					appTview.QueueUpdateDraw(func() {
 						row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
 
-						for j, value := range GetResult(query, filters).Values {
+						for j, value := range GetResult(query, filters, expressions[0]).Values {
 							row.SetCellSimple(i, j, tableCellPadding+cellContentParser(value)+tableCellPadding)
 						}
 					})
@@ -316,7 +316,7 @@ func GraphDisplay(query string, filter string, displayConfig *DisplayConfig) {
 					<-pauseDisplayChan
 				default:
 					// We can display the next result.
-					value := GetResult(query, []string{filter}).Values[0]
+					value := GetResult(query, []string{filter}, "").Values[0]
 					widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
 				}
 			}

@@ -80,6 +80,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 	}
 
 	// Initialize remaining context.
+	ctx = context.WithValue(ctx, "expressions", config.Expressions)
 	ctx = context.WithValue(ctx, "filters", config.Filters)
 	ctx = context.WithValue(ctx, "queries", config.Queries)
 

@@ -21,6 +21,8 @@ import (
 
 	"golang.org/x/exp/slices"
 
+	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/vm"
 	"github.com/spacez320/cryptarch/pkg/storage"
 )
 
@@ -57,8 +59,66 @@ func AddResult(query, result string, history bool) {
 }
 
 // Retrieves a next result.
-func GetResult(query string, filters []string) storage.Result {
-	return store.Next(query, filters, readerIndexes[query])
+func GetResult(query string, filters []string, expression string) (result storage.Result) {
+	var (
+		env     map[string]interface{} // Environment to provide for an expression.
+		err     error                  // General error holder.
+		output  interface{}            // Output from an expression.
+		program *vm.Program            // Expression executable.
+	)
+
+	slog.Debug("Fetching next result")
+
+	// Retrieve the next result.
+	result = store.Next(query, filters, readerIndexes[query])
+
+	if expression != "" {
+		// Process any expression on the result.
+		env = map[string]interface{}{
+			"result": result.Map(store.GetLabels(query, []string{})),
+		}
+		slog.Debug("Applying expression with env", "env", env)
+
+		// Execute any expression.
+		program, err = expr.Compile(expression, expr.Env(env))
+		if err != nil {
+			e(err)
+		}
+		output, err = expr.Run(program, env)
+		if env != nil {
+			e(err)
+		}
+
+		// Re-define result based on the expression output.
+		switch output.(type) {
+		case int:
+			result = storage.Result{
+				Time:   result.Time,
+				Value:  strconv.Itoa(output.(int)),
+				Values: storage.Values{strconv.Itoa(output.(int))},
+			}
+		case int64:
+			result = storage.Result{
+				Time:   result.Time,
+				Value:  strconv.FormatInt(output.(int64), 10),
+				Values: storage.Values{strconv.FormatInt(output.(int64), 10)},
+			}
+		case float64:
+			result = storage.Result{
+				Time:   result.Time,
+				Value:  strconv.FormatFloat(output.(float64), 'f', -1, 64),
+				Values: storage.Values{strconv.FormatFloat(output.(float64), 'f', -1, 64)},
+			}
+		default:
+			result = storage.Result{
+				Time:   result.Time,
+				Value:  output.(string),
+				Values: storage.Values{output.(string)},
+			}
+		}
+	}
+
+	return
 }
 
 // Retrieves a next result, waiting for a non-empty return in a non-blocking manner.
@@ -155,9 +215,10 @@ func Results(
 		pushgateway storage.PushgatewayStorage // Pushgateway configuration.
 		prometheus  storage.PrometheusStorage  // Prometheus configuration.
 
-		filters = ctx.Value("filters").([]string) // Capture filters from context.
-		labels  = ctx.Value("labels").([]string)  // Capture labels from context.
-		queries = ctx.Value("queries").([]string) // Capture queries from context.
+		expressions = ctx.Value("expressions").([]string) // Capture expressions from context.
+		filters     = ctx.Value("filters").([]string)     // Capture filters from context.
+		labels      = ctx.Value("labels").([]string)      // Capture labels from context.
+		queries     = ctx.Value("queries").([]string)     // Capture queries from context.
 	)
 
 	// Assign global config and global control channels.
@@ -211,7 +272,7 @@ func Results(
 			StreamDisplay(query, filters, displayConfig)
 		case DISPLAY_MODE_TABLE:
 			driver = DISPLAY_TVIEW
-			TableDisplay(query, filters, displayConfig)
+			TableDisplay(query, filters, expressions, displayConfig)
 		case DISPLAY_MODE_GRAPH:
 			if len(filters) == 0 {
 				slog.Error("Graph mode requires a filter")

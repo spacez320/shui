@@ -17,20 +17,20 @@ import (
 )
 
 // Queries provided as flags.
-type queriesArg []string
+type multiArg []string
 
-func (q *queriesArg) String() string {
+func (q *multiArg) String() string {
 	// XXX This is necessary to resolve the interface contract, but doesn't seem important.
 	return ""
 }
 
-func (q *queriesArg) Set(query string) error {
+func (q *multiArg) Set(query string) error {
 	*q = append(*q, query)
 	return nil
 }
 
 // Converts to a string slice.
-func (q *queriesArg) ToStrings() (q_strings []string) {
+func (q *multiArg) ToStrings() (q_strings []string) {
 	for _, v := range *q {
 		q_strings = append(q_strings, v)
 	}
@@ -44,27 +44,28 @@ const (
 )
 
 var (
-	count               int        // Number of attempts to execute the query.
-	delay               int        // Delay between queries.
-	displayMode         int        // Result mode to display.
-	filters             string     // Result filters.
-	history             bool       // Whether or not to preserve or use historical results.
-	labels              string     // Result value labels.
-	logFile             string     // Log filte to write to.
-	logLevel            string     // Log level.
-	mode                int        // Mode to execute in.
-	outerPaddingBottom  int        // Bottom padding settings.
-	outerPaddingLeft    int        // Left padding settings.
-	outerPaddingRight   int        // Right padding settings.
-	outerPaddingTop     int        // Top padding settings.
-	port                string     // Port for RPC.
-	promExporterAddr    string     // Address for Prometheus metrics page.
-	promPushgatewayAddr string     // Address for Prometheus Pushgateway.
-	queries             queriesArg // Queries to execute.
-	showHelp            bool       // Whether or not to show helpt
-	showLogs            bool       // Whether or not to show logs.
-	showStatus          bool       // Whether or not to show statuses.
-	silent              bool       // Whether or not to be quiet.
+	count               int      // Number of attempts to execute the query.
+	delay               int      // Delay between queries.
+	displayMode         int      // Result mode to display.
+	expr                string   // Expression to apply to output.
+	filters             string   // Result filters.
+	history             bool     // Whether or not to preserve or use historical results.
+	labels              string   // Result value labels.
+	logFile             string   // Log filte to write to.
+	logLevel            string   // Log level.
+	mode                int      // Mode to execute in.
+	outerPaddingBottom  int      // Bottom padding settings.
+	outerPaddingLeft    int      // Left padding settings.
+	outerPaddingRight   int      // Right padding settings.
+	outerPaddingTop     int      // Top padding settings.
+	port                string   // Port for RPC.
+	promExporterAddr    string   // Address for Prometheus metrics page.
+	promPushgatewayAddr string   // Address for Prometheus Pushgateway.
+	queries             multiArg // Queries to execute.
+	showHelp            bool     // Whether or not to show helpt
+	showLogs            bool     // Whether or not to show logs.
+	showStatus          bool     // Whether or not to show statuses.
+	silent              bool     // Whether or not to be quiet.
 
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
@@ -100,6 +101,7 @@ func main() {
 	flag.IntVar(&outerPaddingLeft, "outer-padding-left", -1, "Left display padding.")
 	flag.IntVar(&outerPaddingRight, "outer-padding-right", -1, "Right display padding.")
 	flag.IntVar(&outerPaddingTop, "outer-padding-top", -1, "Top display padding.")
+	flag.StringVar(&expr, "expr", "", "Expression to apply to output.")
 	flag.StringVar(&filters, "filters", "", "Results filters.")
 	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
 	flag.StringVar(&logFile, "log-file", "", "Log file to write to.")
@@ -150,12 +152,13 @@ func main() {
 		Count:                  count,
 		Delay:                  delay,
 		DisplayMode:            displayMode,
+		Expressions:            []string{expr},
 		Filters:                parseCommaDelimitedStrOrEmpty(filters),
 		History:                history,
 		Labels:                 parseCommaDelimitedStrOrEmpty(labels),
 		LogLevel:               logLevel,
-		Mode:                   mode,
 		LogMulti:               logFile != "",
+		Mode:                   mode,
 		Port:                   port,
 		PrometheusExporterAddr: promExporterAddr,
 		PushgatewayAddr:        promPushgatewayAddr,
