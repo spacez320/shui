@@ -3,7 +3,9 @@
 
 package lib
 
-import "golang.org/x/exp/slog"
+import (
+	"log/slog"
+)
 
 // General error manager.
 func e(err error) {

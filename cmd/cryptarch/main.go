@@ -5,32 +5,32 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/spacez320/cryptarch"
 	"github.com/spacez320/cryptarch/internal/lib"
 )
 
 // Queries provided as flags.
-type queriesArg []string
+type multiArg []string
 
-func (q *queriesArg) String() string {
+func (q *multiArg) String() string {
 	// XXX This is necessary to resolve the interface contract, but doesn't seem important.
 	return ""
 }
 
-func (q *queriesArg) Set(query string) error {
+func (q *multiArg) Set(query string) error {
 	*q = append(*q, query)
 	return nil
 }
 
 // Converts to a string slice.
-func (q *queriesArg) ToStrings() (q_strings []string) {
+func (q *multiArg) ToStrings() (q_strings []string) {
 	for _, v := range *q {
 		q_strings = append(q_strings, v)
 	}
@@ -44,26 +44,28 @@ const (
 )
 
 var (
-	count               int        // Number of attempts to execute the query.
-	delay               int        // Delay between queries.
-	displayMode         int        // Result mode to display.
-	filters             string     // Result filters.
-	history             bool       // Whether or not to preserve or use historical results.
-	labels              string     // Result value labels.
-	logLevel            string     // Log level.
-	mode                int        // Mode to execute in.
-	outerPaddingBottom  int        // Bottom padding settings.
-	outerPaddingLeft    int        // Left padding settings.
-	outerPaddingRight   int        // Right padding settings.
-	outerPaddingTop     int        // Top padding settings.
-	port                string     // Port for RPC.
-	promExporterAddr    string     // Address for Prometheus metrics page.
-	promPushgatewayAddr string     // Address for Prometheus Pushgateway.
-	queries             queriesArg // Queries to execute.
-	showHelp            bool       // Whether or not to show helpt
-	showLogs            bool       // Whether or not to show logs.
-	showStatus          bool       // Whether or not to show statuses.
-	silent              bool       // Whether or not to be quiet.
+	count               int      // Number of attempts to execute the query.
+	delay               int      // Delay between queries.
+	displayMode         int      // Result mode to display.
+	expressions         multiArg // Expression to apply to output.
+	filters             string   // Result filters.
+	history             bool     // Whether or not to preserve or use historical results.
+	labels              string   // Result value labels.
+	logFile             string   // Log filte to write to.
+	logLevel            string   // Log level.
+	mode                int      // Mode to execute in.
+	outerPaddingBottom  int      // Bottom padding settings.
+	outerPaddingLeft    int      // Left padding settings.
+	outerPaddingRight   int      // Right padding settings.
+	outerPaddingTop     int      // Top padding settings.
+	port                string   // Port for RPC.
+	promExporterAddr    string   // Address for Prometheus metrics page.
+	promPushgatewayAddr string   // Address for Prometheus Pushgateway.
+	queries             multiArg // Queries to execute.
+	showHelp            bool     // Whether or not to show helpt
+	showLogs            bool     // Whether or not to show logs.
+	showStatus          bool     // Whether or not to show statuses.
+	silent              bool     // Whether or not to be quiet.
 
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
@@ -101,24 +103,46 @@ func main() {
 	flag.IntVar(&outerPaddingTop, "outer-padding-top", -1, "Top display padding.")
 	flag.StringVar(&filters, "filters", "", "Results filters.")
 	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
+	flag.StringVar(&logFile, "log-file", "", "Log file to write to.")
 	flag.StringVar(&logLevel, "log-level", "error", "Log level.")
 	flag.StringVar(&port, "rpc-port", "12345", "Port for RPC.")
 	flag.StringVar(&promExporterAddr, "prometheus-exporter", "",
 		"Address to present Prometheus metrics.")
 	flag.StringVar(&promPushgatewayAddr, "prometheus-pushgateway", "",
 		"Address for Prometheus Pushgateway.")
-	flag.Var(&queries, "query", "Query to execute. Can be supplied multiple times. When in query"+
-		"mode, this is expected to be some command. When in profile mode it is expected to be PID.")
+	flag.Var(&expressions, "expr", "Expression to apply to output.")
+	flag.Var(&queries, "query", "Query to execute. Can be supplied multiple times. When in query "+
+		"mode, this is expected to be some command. When in profile mode it is expected to be PID. "+
+		"At least one query must be provided.")
 	flag.Parse()
 
+	// Check for required flags.
+	if len(queries) == 0 {
+		flag.Usage()
+		fmt.Fprintf(os.Stderr, "Missing required argument -query\n")
+		os.Exit(1)
+	}
+
 	// Set-up logging.
-	if silent || displayMode == int(lib.DISPLAY_MODE_GRAPH) {
+	if silent {
 		// Silence all output.
 		logger.SetOutput(io.Discard)
+	} else if logFile != "" {
+		// Write logs to a file.
+		logF, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+		if err != nil {
+			panic(err)
+		}
+		defer logF.Close()
+		slog.SetDefault(slog.New(
+			slog.NewTextHandler(
+				logF,
+				&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
+			)))
 	} else {
-		// Set the default to be standard error--result modes may change this.
+		// Set the default to be standard output--result modes may change this.
 		slog.SetDefault(slog.New(slog.NewTextHandler(
-			os.Stderr,
+			os.Stdout,
 			&slog.HandlerOptions{Level: logLevelStrToSlogLevel[logLevel]},
 		)))
 	}
@@ -128,9 +152,12 @@ func main() {
 		Count:                  count,
 		Delay:                  delay,
 		DisplayMode:            displayMode,
+		Expressions:            expressions,
 		Filters:                parseCommaDelimitedStrOrEmpty(filters),
 		History:                history,
 		Labels:                 parseCommaDelimitedStrOrEmpty(labels),
+		LogLevel:               logLevel,
+		LogMulti:               logFile != "",
 		Mode:                   mode,
 		Port:                   port,
 		PrometheusExporterAddr: promExporterAddr,

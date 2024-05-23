@@ -11,7 +11,7 @@ package lib
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -20,8 +20,9 @@ import (
 	"unicode"
 
 	"golang.org/x/exp/slices"
-	"golang.org/x/exp/slog"
 
+	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/vm"
 	"github.com/spacez320/cryptarch/pkg/storage"
 )
 
@@ -41,6 +42,77 @@ var (
 	pauseDisplayChan = make(chan bool) // Channel for dealing with 'pause' events for the display.
 )
 
+// Executes an expression on a result and returns a new result.
+//
+// TODO Currently this compiles expressions on the fly and constructs a result object on every
+// iteration. In the future, it might be important from a performance perspective to pre-compile
+// expressions and avoid constructing results before it's necessary.
+func exprResult(
+	query, expression string,
+	result, prevResult storage.Result,
+) (newResult storage.Result, err error) {
+	var (
+		env     map[string]interface{} // Environment to provide for an expression.
+		output  interface{}            // Output from an expression.
+		program *vm.Program            // Expression executable.
+	)
+
+	// Construct the expression environment.
+	env = map[string]interface{}{
+		"prevResult": prevResult.Map(store.GetLabels(query, []string{})),
+		"result":     result.Map(store.GetLabels(query, []string{})),
+	}
+	slog.Debug("Expression executing", "query", query, "expression", expression, "env", env)
+
+	// Execute any expression.
+	program, err = expr.Compile(expression, expr.Env(env))
+	if err != nil {
+		slog.Error("Failed to compile expression", "expr", expression, "env", env)
+		return result, err
+	}
+	output, err = expr.Run(program, env)
+	if err != nil {
+		slog.Error("Expression failed to execute", "expr", expression, "env", env)
+		return result, err
+	}
+
+	// Re-define result based on the expression output.
+	switch output.(type) {
+	case bool:
+		newResult = storage.Result{
+			Time:   result.Time,
+			Value:  strconv.FormatBool(output.(bool)),
+			Values: storage.Values{strconv.FormatBool(output.(bool))},
+		}
+	case int:
+		newResult = storage.Result{
+			Time:   result.Time,
+			Value:  strconv.Itoa(output.(int)),
+			Values: storage.Values{strconv.Itoa(output.(int))},
+		}
+	case int64:
+		newResult = storage.Result{
+			Time:   result.Time,
+			Value:  strconv.FormatInt(output.(int64), 10),
+			Values: storage.Values{strconv.FormatInt(output.(int64), 10)},
+		}
+	case float64:
+		newResult = storage.Result{
+			Time:   result.Time,
+			Value:  strconv.FormatFloat(output.(float64), 'f', -1, 64),
+			Values: storage.Values{strconv.FormatFloat(output.(float64), 'f', -1, 64)},
+		}
+	default:
+		newResult = storage.Result{
+			Time:   result.Time,
+			Value:  output.(string),
+			Values: storage.Values{output.(string)},
+		}
+	}
+
+	return
+}
+
 // Resets the current context to its default values.
 func resetContext(query string) {
 	for k, v := range ctxDefaults {
@@ -49,16 +121,48 @@ func resetContext(query string) {
 	currentCtx = context.WithValue(currentCtx, "query", query)
 }
 
-// Adds a result to the result store based on a string.
+// Adds a result to the result store based on a string. It is assumed that all processing has
+// ocurred on the result itself.
 func AddResult(query, result string, history bool) {
 	result = strings.TrimSpace(result)
 	_, err := store.Put(query, result, history, TokenizeResult(result)...)
 	e(err)
 }
 
+// Get results previous to the last read result.
+func GetPrevResults(query string, filters []string) (results []storage.Result) {
+	slog.Debug("Fetching previous results", "query", query)
+
+	// Retrieve previous results.
+	return store.GetToIndex(query, filters, readerIndexes[query])
+}
+
 // Retrieves a next result.
-func GetResult(query string) storage.Result {
-	return store.Next(query, readerIndexes[query])
+func GetResult(query string, filters []string) (result storage.Result) {
+	slog.Debug("Fetching next result", "query", query)
+
+	return store.Next(query, filters, readerIndexes[query])
+}
+
+// Returns a result after applying expressions. Requires a previous result for calculations
+// requiring history. It is expected that a query can tolerate the potential emptyness of
+// prevResult, namely on the first execution.
+func ExprResult(
+	query string,
+	expressions []string,
+	result, prevResult storage.Result,
+) storage.Result {
+	var err error // General error holder.
+
+	// Process any expressions on the result.
+	for _, expression := range expressions {
+		result, err = exprResult(query, expression, result, prevResult)
+		if err != nil {
+			e(err)
+		}
+	}
+
+	return result
 }
 
 // Retrieves a next result, waiting for a non-empty return in a non-blocking manner.
@@ -79,11 +183,13 @@ func GetResultWait(query string) (result storage.Result) {
 }
 
 // Creates a result with filtered values.
-func FilterResult(result storage.Result, labels, filters []string) storage.Result {
+func FilterResult(result storage.Result, filters, labels []string) storage.Result {
 	var (
 		labelIndexes = make([]int, len(filters))         // Indexes of labels from filters, corresponding to result values.
 		resultValues = make([]interface{}, len(filters)) // Found result values.
 	)
+
+	slog.Debug("Filtering result", "result", result, "filters", filters, "labels", labels)
 
 	// Find indexes to pursue for results.
 	for i, filter := range filters {
@@ -153,9 +259,10 @@ func Results(
 		pushgateway storage.PushgatewayStorage // Pushgateway configuration.
 		prometheus  storage.PrometheusStorage  // Prometheus configuration.
 
-		filters = ctx.Value("filters").([]string) // Capture filters from context.
-		labels  = ctx.Value("labels").([]string)  // Capture labels from context.
-		queries = ctx.Value("queries").([]string) // Capture queries from context.
+		expressions = ctx.Value("expressions").([]string) // Capture expressions from context.
+		filters     = ctx.Value("filters").([]string)     // Capture filters from context.
+		labels      = ctx.Value("labels").([]string)      // Capture labels from context.
+		queries     = ctx.Value("queries").([]string)     // Capture queries from context.
 	)
 
 	// Assign global config and global control channels.
@@ -187,7 +294,7 @@ func Results(
 	}
 
 	// Signals that results are ready to be received.
-	slog.Debug("Results are ready to receive.")
+	slog.Debug("Results are ready")
 	resultsReadyChan <- true
 
 	for {
@@ -203,18 +310,25 @@ func Results(
 		switch displayMode {
 		case DISPLAY_MODE_RAW:
 			driver = DISPLAY_RAW
-			RawDisplay(query)
+			RawDisplay(query, filters, expressions)
 		case DISPLAY_MODE_STREAM:
 			driver = DISPLAY_TVIEW
-			StreamDisplay(query, filters, labels, displayConfig)
+			StreamDisplay(query, filters, expressions, displayConfig)
 		case DISPLAY_MODE_TABLE:
 			driver = DISPLAY_TVIEW
-			TableDisplay(query, filters, labels, displayConfig)
+			TableDisplay(query, filters, expressions, displayConfig)
 		case DISPLAY_MODE_GRAPH:
+			if len(filters) == 0 {
+				slog.Error("Graph mode requires a filter")
+				os.Exit(1)
+			}
+			if len(filters) > 1 {
+				slog.Warn("Graph mode can only apply one filter; ignoring all but the first")
+			}
 			driver = DISPLAY_TERMDASH
-			GraphDisplay(query, filters, labels, displayConfig)
+			GraphDisplay(query, filters[0], expressions, displayConfig)
 		default:
-			slog.Error(fmt.Sprintf("Invalid result driver: %d\n", displayMode))
+			slog.Error("Invalid result driver", "displayMode", displayMode)
 			os.Exit(1)
 		}
 

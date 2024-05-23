@@ -6,6 +6,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/mum4k/termdash"
 	"github.com/mum4k/termdash/container"
@@ -15,18 +16,18 @@ import (
 	"github.com/mum4k/termdash/terminal/terminalapi"
 	"github.com/mum4k/termdash/widgetapi"
 	"github.com/mum4k/termdash/widgets/text"
-	"golang.org/x/exp/slog"
+	slogmulti "github.com/samber/slog-multi"
 )
 
 // Used to provide an io.Writer implementation of termdash text widgets.
 type termdashTextWriter struct {
-	text text.Text
+	text *text.Text
 }
 
 // Implements io.Writer.
 func (t *termdashTextWriter) Write(p []byte) (n int, err error) {
-	t.text.Write(string(p))
-	return len(p), nil
+	err = t.text.Write(string(p))
+	return len(p), err
 }
 
 // Used to supply optional widgets to Termdash initialization.
@@ -45,14 +46,14 @@ func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 	switch key.Key {
 	case keyboard.KeyEsc:
 		// Escape quits the program.
-		slog.Debug("Quitting.")
+		slog.Debug("Quitting")
 
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		cancel()
 		appTermdash.Close()
 	case keyboard.KeyTab:
 		// Tab switches display modes.
-		slog.Debug("Switching display mode.")
+		slog.Debug("Switching display mode")
 
 		interruptChan <- true
 		currentCtx = context.WithValue(currentCtx, "advanceDisplayMode", true)
@@ -60,7 +61,7 @@ func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 		appTermdash.Close()
 	case 'n':
 		// 'n' switches queries.
-		slog.Debug("Switching query.")
+		slog.Debug("Switching query")
 
 		interruptChan <- true
 		currentCtx = context.WithValue(currentCtx, "advanceQuery", true)
@@ -68,7 +69,7 @@ func keyboardTermdashHandler(key *terminalapi.Keyboard) {
 		appTermdash.Close()
 	case ' ':
 		// Space pauses.
-		slog.Debug("Pausing.")
+		slog.Debug("Pausing")
 
 		pauseDisplayChan <- true
 		pauseQueryChans[currentCtx.Value("query").(string)] <- true
@@ -93,11 +94,12 @@ func initDisplayTermdash(
 	displayConfig *DisplayConfig,
 ) {
 	var (
-		ctx              context.Context      // Termdash specific context.
-		err              error                // General error holder.
-		logsWidgetWriter termdashTextWriter   // Writer implementation for logs.
-		mainWidgets      []container.Option   // Status and result widgets.
-		widgetContainer  *container.Container // Wrapper for widgets.
+		ctx               context.Context      // Termdash specific context.
+		err               error                // General error holder.
+		logsWidgetWriter  termdashTextWriter   // Writer implementation for logs.
+		logsWidgetHandler slog.Handler         // Log handler for Termdash apps.
+		mainWidgets       []container.Option   // Status and result widgets.
+		widgetContainer   *container.Container // Wrapper for widgets.
 	)
 	widgets.filterWidget, err = text.New()
 	e(err)
@@ -113,7 +115,7 @@ func initDisplayTermdash(
 		widgets.helpWidget.Write(HELP_TEXT)
 	}
 	if displayConfig.ShowLogs {
-		widgets.logsWidget, err = text.New()
+		widgets.logsWidget, err = text.New(text.RollContent())
 		e(err)
 	}
 
@@ -224,13 +226,7 @@ func initDisplayTermdash(
 			),
 		)
 	} else if widgets.logsWidget != nil {
-		// We have just the logs widget enabled. We also need to point logs to it.
-		logsWidgetWriter = termdashTextWriter{text: *widgets.logsWidget}
-		slog.SetDefault(slog.New(slog.NewTextHandler(
-			&logsWidgetWriter,
-			&slog.HandlerOptions{Level: config.SlogLogLevel()},
-		)))
-
+		// We have just the logs widget enabled.
 		widgetContainer, err = container.New(
 			appTermdash,
 			container.PaddingBottom(displayConfig.OuterPaddingBottom),
@@ -243,7 +239,7 @@ func initDisplayTermdash(
 					container.Border(linestyle.Light),
 					container.BorderTitle("Logs"),
 					container.BorderTitleAlignCenter(),
-					container.PlaceWidget(&logsWidgetWriter.text),
+					container.PlaceWidget(logsWidgetWriter.text),
 				),
 				// XXX The -1 is to try to match tview's proportions.
 				container.SplitOption(
@@ -263,6 +259,22 @@ func initDisplayTermdash(
 		widgetContainer.Update("main", mainWidgets...)
 	}
 	e(err)
+
+	if widgets.logsWidget != nil {
+		// Define a logging sink for Termdash apps.
+		logsWidgetWriter = termdashTextWriter{text: widgets.logsWidget}
+		logsWidgetHandler = slog.NewTextHandler(
+			&logsWidgetWriter,
+			&slog.HandlerOptions{Level: config.SlogLogLevel()},
+		)
+		if config.LogMulti {
+			// We need to preserve the existing log stream.
+			slog.SetDefault(slog.New(slogmulti.Fanout(slog.Default().Handler(), logsWidgetHandler)))
+		} else {
+			// We should only log to the widget.
+			slog.SetDefault(slog.New(logsWidgetHandler))
+		}
+	}
 
 	// Initialize the top-line status widgets.
 	widgets.queryWidget.Write(query)

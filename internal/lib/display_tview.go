@@ -6,10 +6,11 @@ package lib
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
-	"golang.org/x/exp/slog"
+	slogmulti "github.com/samber/slog-multi"
 )
 
 // Widgets for tview displays.
@@ -31,7 +32,7 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 	switch key := event.Key(); key {
 	case tcell.KeyEscape:
 		// Escape quits the program.
-		slog.Debug("Quitting.")
+		slog.Debug("Quitting")
 
 		currentCtx = context.WithValue(currentCtx, "quit", true)
 		appTview.Stop()
@@ -39,7 +40,7 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
 		case 'n':
 			// 'n' switches queries.
-			slog.Debug("Switching query.")
+			slog.Debug("Switching query")
 
 			go func() {
 				// When a user presses Tab, stop the display but continue running.
@@ -49,7 +50,7 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 			}()
 		case ' ':
 			// Space pauses.
-			slog.Debug("Pausing.")
+			slog.Debug("Pausing")
 
 			go func() {
 				pauseDisplayChan <- true
@@ -58,7 +59,7 @@ func keyboardTviewHandler(event *tcell.EventKey) *tcell.EventKey {
 		}
 	case tcell.KeyTab:
 		// Tab switches display modes.
-		slog.Debug("Switching display mode.")
+		slog.Debug("Switching display mode")
 
 		go func() {
 			interruptChan <- true
@@ -116,7 +117,8 @@ func initDisplayTview(
 	displayConfig *DisplayConfig,
 ) {
 	var (
-		statusWidgets *tview.Flex // Container for status widgets.
+		logsWidgetHandler slog.Handler // Log handler for Tview apps.
+		statusWidgets     *tview.Flex  // Container for status widgets.
 	)
 
 	widgets.filterWidget = tview.NewTextView()
@@ -162,10 +164,19 @@ func initDisplayTview(
 	// Initialize the logs view.
 	widgets.logsWidget.SetScrollable(false).SetChangedFunc(func() { appTview.Draw() })
 	widgets.logsWidget.SetBorder(true).SetTitle("Logs")
-	slog.SetDefault(slog.New(slog.NewTextHandler(
+
+	// Define a logging sink for Tview apps.
+	logsWidgetHandler = slog.NewTextHandler(
 		widgets.logsWidget,
 		&slog.HandlerOptions{Level: config.SlogLogLevel()},
-	)))
+	)
+	if config.LogMulti {
+		// We need to preserve the existing log stream.
+		slog.SetDefault(slog.New(slogmulti.Fanout(slog.Default().Handler(), logsWidgetHandler)))
+	} else {
+		// We should only log to the widget.
+		slog.SetDefault(slog.New(logsWidgetHandler))
+	}
 
 	// Hide displays we don't want to show.
 	if !displayConfig.ShowHelp {

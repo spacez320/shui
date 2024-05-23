@@ -5,12 +5,15 @@ package lib
 
 import (
 	"fmt"
+	_ "log/slog"
 	"strconv"
 	"strings"
 
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/widgets/sparkline"
 	"github.com/rivo/tview"
+
+	"github.com/spacez320/cryptarch/pkg/storage"
 )
 
 // General configuration for display modes.
@@ -109,8 +112,10 @@ func NewDisplayConfig() *DisplayConfig {
 }
 
 // Presents raw output.
-func RawDisplay(query string) {
+func RawDisplay(query string, filters, expressions []string) {
 	var (
+		nextResult, prevResult storage.Result // Results tracking.
+
 		reader = readerIndexes[query] // Reader index for the query.
 	)
 
@@ -119,44 +124,68 @@ func RawDisplay(query string) {
 	reader.Dec()
 
 	// Load existing results.
-	for _, result := range store.GetToIndex(query, reader) {
+	for _, result := range store.GetToIndex(query, filters, reader) {
+		// Execute any expressions.
+		if len(expressions) > 0 {
+			result = ExprResult(query, expressions, result, prevResult)
+		}
+
 		fmt.Println(result)
+
+		prevResult = result
 	}
 
 	// Load new results.
 	for {
-		fmt.Println(GetResult(query))
+		// Get a result and execute expressions.
+		nextResult = GetResult(query, filters)
+		if len(expressions) > 0 {
+			nextResult = ExprResult(query, expressions, nextResult, prevResult)
+		}
+
+		fmt.Println(nextResult)
+
+		prevResult = nextResult
 	}
 }
 
 // Update the results pane with new results as they are generated.
-func StreamDisplay(query string, filters, labels []string, displayConfig *DisplayConfig) {
+func StreamDisplay(query string, filters, expressions []string, displayConfig *DisplayConfig) {
 	var (
+		widgets tviewWidgets // Widgets produced by tview.
+
 		reader = readerIndexes[query] // Reader index for the query.
 	)
 
-	// ait for the first result to appear to synchronize storage.
+	// Wait for the first result to appear to synchronize storage.
 	GetResultWait(query)
 	reader.Dec()
 
 	// Initialize the display.
-	widgets := initDisplayTviewText(query, filters, labels, displayConfig)
+	widgets = initDisplayTviewText(query, filters, store.GetLabels(query, []string{}), displayConfig)
 
 	// Start the display.
 	display(
 		DISPLAY_TVIEW,
 		func() {
-			// Print labels as the first line.
-			appTview.QueueUpdateDraw(func() {
-				fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), labels)
-			})
+			var (
+				nextResult, prevResult storage.Result // Results tracking.
+			)
 
-			// Print all previous results.
-			for _, result := range store.GetToIndex(query, reader) {
-				fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), result.Value)
+			// Load existing results.
+			for _, result := range store.GetToIndex(query, filters, reader) {
+				// Execute any expressions.
+				if len(expressions) > 0 {
+					result = ExprResult(query, expressions, result, prevResult)
+				}
+
+				// Display the next result.
+				fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), result.Values)
+
+				prevResult = result
 			}
 
-			// Print results.
+			// Load new results.
 			for {
 				// Listen for an interrupt to stop result consumption for some display change.
 				select {
@@ -167,8 +196,16 @@ func StreamDisplay(query string, filters, labels []string, displayConfig *Displa
 					// We've received a pause and need to wait for an unpause.
 					<-pauseDisplayChan
 				default:
+					// Get a result and execute expressions.
+					nextResult = GetResult(query, filters)
+					if len(expressions) > 0 {
+						nextResult = ExprResult(query, expressions, nextResult, prevResult)
+					}
+
 					// We can display the next result.
-					fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), (GetResult(query)).Value)
+					fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), nextResult.Values)
+
+					prevResult = nextResult
 				}
 			}
 		},
@@ -176,74 +213,83 @@ func StreamDisplay(query string, filters, labels []string, displayConfig *Displa
 }
 
 // Creates a table of results for the results pane.
-func TableDisplay(query string, filters, labels []string, displayConfig *DisplayConfig) {
+func TableDisplay(query string, filters, expressions []string, displayConfig *DisplayConfig) {
 	var (
+		labels  []string     // Labels to use for displaying.
 		widgets tviewWidgets // Widgets produced by tview.
 
+		cellContentParser = func(value interface{}) (cellContent string) {
+			switch value.(type) {
+			case int64:
+				cellContent = strconv.FormatInt(value.(int64), 10)
+			case float64:
+				cellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
+			default:
+				cellContent = value.(string)
+			}
+			return
+		} // Parses results for displaying in table cells.
 		reader           = readerIndexes[query]                            // Reader index for the query.
 		tableCellPadding = strings.Repeat(" ", displayConfig.TablePadding) // Padding to add to table cell content.
-		valueIndexes     = []int{}                                         // Indexes of the result values to add to the table.
 	)
 
 	// Wait for the first result to appear to synchronize storage.
 	GetResultWait(query)
 	reader.Dec()
 
+	// Determine labels to display as part of the table, based on the presence of expressions.
+	if len(expressions) > 0 {
+		// Expressions provide single-value results--apply a generic label.
+		labels = []string{"results"}
+	} else {
+		// Get labels according to filters.
+		labels = store.GetLabels(query, filters)
+	}
+
 	// Initialize the display.
-	widgets = initDisplayTviewTable(query, filters, labels, displayConfig)
+	widgets = initDisplayTviewTable(query, filters, store.GetLabels(query, []string{}), displayConfig)
 
 	// Start the display.
 	display(
 		DISPLAY_TVIEW,
 		func() {
 			var (
-				nextCellContent string // Next cell to add to the table.
+				nextResult, prevResult storage.Result // Results tracking.
 
 				i = 0 // Used to determine the next row index.
 			)
 
-			// Determine the value indexes to populate into the graph. If no filter is provided, the index
-			// is assumed to be zero.
-			if len(filters) > 0 {
-				for _, filter := range filters {
-					valueIndexes = append(valueIndexes, store.GetValueIndex(query, filter))
-				}
-			}
-
+			// Load table header.
 			appTview.QueueUpdateDraw(func() {
 				// Row to contain the labels.
 				headerRow := widgets.resultsWidget.(*tview.Table).InsertRow(i)
-
-				for j, label := range FilterSlice(labels, valueIndexes) {
+				for j, label := range labels {
 					headerRow.SetCellSimple(i, j, tableCellPadding+label+tableCellPadding)
 				}
 			})
 			i += 1
 
-			// Print all previous results.
-			for _, result := range store.GetToIndex(query, reader) {
+			// Load existing results.
+			for _, result := range GetPrevResults(query, filters) {
 				appTview.QueueUpdateDraw(func() {
-					var (
-						row = widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
-					)
+					row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
 
-					for j, value := range FilterSlice(result.Values, valueIndexes) {
-						// Extrapolate the field types in order to print them out.
-						switch value.(type) {
-						case int64:
-							nextCellContent = strconv.FormatInt(value.(int64), 10)
-						case float64:
-							nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
-						default:
-							nextCellContent = value.(string)
-						}
-						row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
+					// Execute any expressions.
+					if len(expressions) > 0 {
+						result = ExprResult(query, expressions, result, prevResult)
 					}
+
+					// Load results into the next row.
+					for j, value := range result.Values {
+						row.SetCellSimple(i, j, tableCellPadding+cellContentParser(value)+tableCellPadding)
+					}
+
+					prevResult = result
+					i += 1
 				})
-				i += 1
 			}
 
-			// Print results.
+			// Load new results.
 			for {
 				// Listen for an interrupt to stop result consumption for some display change.
 				select {
@@ -256,24 +302,22 @@ func TableDisplay(query string, filters, labels []string, displayConfig *Display
 				default:
 					// We can display the next result.
 					appTview.QueueUpdateDraw(func() {
-						var (
-							row = widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
-						)
+						row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
 
-						for j, value := range FilterSlice((GetResult(query)).Values, valueIndexes) {
-							// Extrapolate the field types in order to print them out.
-							switch value.(type) {
-							case int64:
-								nextCellContent = strconv.FormatInt(value.(int64), 10)
-							case float64:
-								nextCellContent = strconv.FormatFloat(value.(float64), 'f', -1, 64)
-							default:
-								nextCellContent = value.(string)
-							}
-							row.SetCellSimple(i, j, tableCellPadding+nextCellContent+tableCellPadding)
+						// Get a result and execute expressions.
+						nextResult = GetResult(query, filters)
+						if len(expressions) > 0 {
+							nextResult = ExprResult(query, expressions, GetResult(query, filters), prevResult)
 						}
+
+						// Display something if we have something.
+						for j, value := range nextResult.Values {
+							row.SetCellSimple(i, j, tableCellPadding+cellContentParser(value)+tableCellPadding)
+						}
+
+						prevResult = nextResult
+						i += 1
 					})
-					i += 1
 				}
 			}
 		},
@@ -281,10 +325,19 @@ func TableDisplay(query string, filters, labels []string, displayConfig *Display
 }
 
 // Creates a graph of results for the results pane.
-func GraphDisplay(query string, filters, labels []string, displayConfig *DisplayConfig) {
+func GraphDisplay(query string, filter string, expressions []string, displayConfig *DisplayConfig) {
 	var (
 		err error // General error holder.
 
+		sparkParser = func(value interface{}) (spark []int) {
+			switch value.(type) {
+			case int64:
+				spark = []int{int(value.(int64))}
+			case float64:
+				spark = []int{int(value.(float64))}
+			}
+			return
+		} // Parses results for displaying in table cells.
 		reader     = readerIndexes[query] // Reader index for the query.
 		valueIndex = 0                    // Index of the result value to graph.
 		widgets    = termdashWidgets{}    // Widgets for displaying.
@@ -295,8 +348,9 @@ func GraphDisplay(query string, filters, labels []string, displayConfig *Display
 	reader.Dec()
 
 	// Determine the values to populate into the graph. If none is provided, the first value is taken.
-	if len(filters) > 0 {
-		valueIndex = store.GetValueIndex(query, filters[0])
+	// Only one filter may be provided.
+	if filter != "" {
+		valueIndex = store.GetValueIndex(query, filter)
 	}
 
 	// Initialize the results view.
@@ -304,7 +358,7 @@ func GraphDisplay(query string, filters, labels []string, displayConfig *Display
 	// XXX This should probably moved into `display_termdash.go` once termdash is managing more types
 	// of result displays.
 	widgets.resultsWidget, err = sparkline.New(
-		sparkline.Label(labels[valueIndex]),
+		sparkline.Label(store.GetLabels(query, []string{})[valueIndex]),
 		sparkline.Color(cell.ColorGreen),
 	)
 	e(err)
@@ -313,19 +367,29 @@ func GraphDisplay(query string, filters, labels []string, displayConfig *Display
 	display(
 		DISPLAY_TERMDASH,
 		func() {
-			// Print all previous results.
-			for _, result := range store.GetToIndex(query, reader) {
-				// We can display the next result.
-				value := result.Values.Get(valueIndex)
+			var (
+				nextResult, prevResult storage.Result // Results tracking.
+				value                  float64        // Value to ultimately display.
+			)
 
-				switch value.(type) {
-				case int64:
-					widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(int64))})
-				case float64:
-					widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(float64))})
+			// Load existing results.
+			for _, result := range store.GetToIndex(query, []string{filter}, reader) {
+				// Execute any expressions.
+				if len(expressions) > 0 {
+					result = ExprResult(query, expressions, result, prevResult)
+					// Expressions always return a string, so always try to convert it into a float.
+					value, _ = strconv.ParseFloat(result.Values[0].(string), 10)
+					widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
+				} else {
+					// Use typless assignment to account for various numeric values.
+					value := result.Values[0]
+					widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
 				}
+
+				prevResult = result
 			}
 
+			// Load new results.
 			for {
 				// Listen for an interrupt to stop result consumption for some display change.
 				select {
@@ -336,21 +400,32 @@ func GraphDisplay(query string, filters, labels []string, displayConfig *Display
 					// We've received a pause and need to wait for an unpause.
 					<-pauseDisplayChan
 				default:
-					// We can display the next result.
-					value := (GetResult(query)).Values.Get(valueIndex)
-
-					switch value.(type) {
-					case int64:
-						widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(int64))})
-					case float64:
-						widgets.resultsWidget.(*sparkline.SparkLine).Add([]int{int(value.(float64))})
+					// Get a result and execute expressions.
+					nextResult = GetResult(query, []string{filter})
+					if len(expressions) > 0 {
+						nextResult = ExprResult(query, expressions, nextResult, prevResult)
+						// Expressions always return a string, so always try to convert it into a float.
+						value, _ = strconv.ParseFloat(nextResult.Values[0].(string), 10)
+						widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
+					} else {
+						// Use typless assignment to account for various numeric values.
+						value := nextResult.Values[0]
+						widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
 					}
 				}
+
+				prevResult = nextResult
 			}
 		},
 	)
 
 	// Initialize the display. This must happen after the display function is invoked, otherwise data
 	// will never appear.
-	initDisplayTermdash(widgets, query, filters, labels, displayConfig)
+	initDisplayTermdash(
+		widgets,
+		query,
+		[]string{filter},
+		store.GetLabels(query, []string{filter}),
+		displayConfig,
+	)
 }

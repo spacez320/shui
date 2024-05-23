@@ -14,5 +14,5 @@ type NaNError struct {
 }
 
 func (e *NaNError) Error() string {
-	return fmt.Sprintf("Attempted to use non-numeric value in numerical context. Value: %v", e.Value)
+	return fmt.Sprintf("Attempted to use non-numeric value in numerical context, Value: %v", e.Value)
 }

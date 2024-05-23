@@ -3,9 +3,7 @@
 
 package lib
 
-import (
-	"golang.org/x/exp/slog"
-)
+import "log/slog"
 
 var (
 	logLevelStrtoSlogLevel = map[string]slog.Level{
@@ -18,13 +16,13 @@ var (
 
 // Shareable configuration. See CLI flags for further details.
 type Config struct {
-	Count, Delay, DisplayMode, Mode int
-	Filters, Labels, Queries        []string
-	History, Silent                 bool
-	LogLevel                        string
-	Port                            string
-	PrometheusExporterAddr          string
-	PushgatewayAddr                 string
+	Count, Delay, DisplayMode, Mode       int
+	Expressions, Filters, Labels, Queries []string
+	History, LogMulti, Silent             bool
+	LogLevel                              string
+	Port                                  string
+	PrometheusExporterAddr                string
+	PushgatewayAddr                       string
 }
 
 // Retrieves an Slog level from a human-readable level string.

@@ -6,9 +6,8 @@ package cryptarch
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/spacez320/cryptarch/internal/lib"
 )
@@ -35,11 +34,13 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 
 		resultsReadyChan = make(chan bool) // Channel for signaling results readiness.
 	)
+	slog.Debug("Running with config", "config", config)
+	slog.Debug("Running with display config", "displayConfig", displayConfig)
 
 	// Execute the specified mode.
 	switch {
 	case config.Mode == int(MODE_PROFILE):
-		slog.Debug("Executing in profile mode.")
+		slog.Debug("Executing in profile mode")
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_PROFILE,
@@ -54,7 +55,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 		// Process mode has specific labels--ignore user provided ones.
 		ctx = context.WithValue(ctx, "labels", lib.ProfileLabels)
 	case config.Mode == int(MODE_QUERY):
-		slog.Debug("Executing in query mode.")
+		slog.Debug("Executing in query mode")
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_COMMAND,
@@ -69,7 +70,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 		// Rely on user-defined labels.
 		ctx = context.WithValue(ctx, "labels", config.Labels)
 	case config.Mode == int(MODE_READ):
-		slog.Debug("Executing in read mode.")
+		slog.Debug("Executing in read mode")
 
 	// FIXME Temporarily disabling read mode.
 	// 	done = lib.Read(port)
@@ -79,6 +80,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 	}
 
 	// Initialize remaining context.
+	ctx = context.WithValue(ctx, "expressions", config.Expressions)
 	ctx = context.WithValue(ctx, "filters", config.Filters)
 	ctx = context.WithValue(ctx, "queries", config.Queries)
 
@@ -90,11 +92,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
 			config.History,
 			&displayConfig,
-			&lib.Config{
-				LogLevel:               config.LogLevel,
-				PrometheusExporterAddr: config.PrometheusExporterAddr,
-				PushgatewayAddr:        config.PushgatewayAddr,
-			},
+			&config,
 			pauseQueryChans,
 			resultsReadyChan,
 		)

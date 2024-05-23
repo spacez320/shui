@@ -7,11 +7,10 @@ package lib
 
 // import (
 // 	"fmt"
+// 	"log/slog"
 // 	"net"
 // 	"net/http"
 // 	"net/rpc"
-//
-// 	"golang.org/x/exp/slog"
 // )
 
 // Establish the RPC server to allow access to stored results.
