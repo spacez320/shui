@@ -145,8 +145,8 @@ func GetResult(query string, filters []string) (result storage.Result) {
 }
 
 // Returns a result after applying expressions. Requires a previous result for calculations
-// requiring history. It is expected that a query
-// and so expressions will only be possible once at least one result has compiled.
+// requiring history. It is expected that a query can tolerate the potential emptyness of
+// prevResult, namely on the first execution.
 func ExprResult(
 	query string,
 	expressions []string,
