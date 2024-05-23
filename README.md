@@ -64,12 +64,33 @@ produce a number).
 
 ![Demo of graph display](https://raw.githubusercontent.com/spacez320/cryptarch/master/assets/graph-display.gif)
 
-### Persistence
+### Examples
 
-Cryptarch, by default, will store results and load them when re-executing the same query.
+These example should some basic usage.
 
-The only currently supported storage is local disk, located in the user's cache directory. See:
-<https://pkg.go.dev/os#UserCacheDir>.
+> The examples below have been tested on `GNU bash, version 5.2.15(1)-release`.
+
+```sh
+# See help.
+cryptarch -h
+
+# Execute `whoami` once, printing results to the console and waiting for a user to `^C`.
+cryptarch -query 'whoami'
+
+# Execute `uptime` continuously, printing results to the console, without using persistence.
+cryptarch \
+    -count -1 \
+    -query 'uptime' \
+    -store=none
+
+# Get the size of an NVME disk's used space and output it to a table with the specific label "NVME
+# Used Space".
+cryptarch \
+    -count -1 \
+    -display 3 \
+    -labels "NVME Used Space" \
+    -query 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\'''
+```
 
 ### Integrations
 
@@ -105,31 +126,45 @@ cryptarch_cat_file_txt_wc{cryptarch_label="bytes"}
 > **NOTE:** The only currently supported metric is a **Gauge** and queries must provide something
 > numerical to be recorded.
 
-### More Examples
+### Persistence
 
-> The examples below have been tested on `GNU bash, version 5.2.15(1)-release`.
+Cryptarch, by default, will store results and load them when re-executing the same query.
+
+The only currently supported storage is local disk, located in the user's cache directory. See:
+<https://pkg.go.dev/os#UserCacheDir>.
+
+### Expressions
+
+Cryptarch has the ability to execute "expressions" on query results in order to manipulate them
+before display (e.g. performing statistics, combining values, producing cumulative series, etc.).
+
+Some key points about expressions:
+
+- Multiple expressions may be provided and execute in the order provided.
+- Filters apply before expressions.
+- It uses Expr, a Go-centric expression language.
+- The expression language is type sensitive, but results of expressions will always be strings.
+
+Expressions are able to access variables:
+
+1.  `result`, a map of the current result's labels to values.
+2.  `prevResult`, the previous result mapping, for cumulative results. Note that expressions must
+    account for `prevResult` being an empty map for the first result in a series.
+
+Some examples:
 
 ```sh
-# See help.
-cryptarch -h
+# Multiply the 5m CPU average by 10. Note that we invoke `get` with a key of `"9"` because default #
+# labels are string indexes and no labels were provided.
+cryptarch -query 'uptime | tr -d ","' -expr 'get(result, "9") * 10'
 
-# Execute `whoami` once, printing results to the console and waiting for a user to `^C`.
-cryptarch -query 'whoami'
-
-# Execute `uptime` continuously, printing results to the console, without using persistence.
-cryptarch \
-    -count -1 \
-    -query 'uptime' \
-    -store=none
-
-# Get the size of an NVME disk's used space and output it to a table with the specific label "NVME
-# Used Space".
-cryptarch \
-    -count -1 \
-    -display 3 \
-    -labels "NVME Used Space" \
-    -query 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\'''
+# Cumulatively sum 5m CPU average. Note that we need to account for prevResult being empty and we
+# must convert the prevResult from a string to a float.
+cryptarch -query 'uptime | tr -d ","' -filters 9 -expr 'get(result, "0") + ("0" in prevResult?
+float(get(prevResult, "0")) : 0)'
 ```
+
+See: <https://expr-lang.org/docs/language-definition>
 
 Future
 ------
@@ -142,7 +177,7 @@ Planned improvements include things like:
 
 - [ ] Background execution.
 - [x] Persistent results.
-- [ ] Ability to perform calculations on streams of data, such as aggregates, rates, or quantile math.
+- [x] Ability to perform calculations on streams of data, such as aggregates, rates, or quantile math.
 - [ ] Better text result management, such as diff'ing.
 - [x] Export data to external systems, such as Prometheus.
 - [ ] ... and Elasticsearch.
