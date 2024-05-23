@@ -66,7 +66,7 @@ produce a number).
 
 ### Examples
 
-These example should some basic usage.
+These examples show basic usage.
 
 > The examples below have been tested on `GNU bash, version 5.2.15(1)-release`.
 
