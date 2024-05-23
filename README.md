@@ -154,7 +154,7 @@ Expressions are able to access variables:
 Some examples:
 
 ```sh
-# Multiply the 5m CPU average by 10. Note that we invoke `get` with a key of `"9"` because default #
+# Multiply the 5m CPU average by 10. Note that we invoke `get` with a key of `"9"` because default
 # labels are string indexes and no labels were provided.
 cryptarch -query 'uptime | tr -d ","' -expr 'get(result, "9") * 10'
 
