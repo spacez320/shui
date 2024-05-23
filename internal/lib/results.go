@@ -47,52 +47,63 @@ var (
 // TODO Currently this compiles expressions on the fly and constructs a result object on every
 // iteration. In the future, it might be important from a performance perspective to pre-compile
 // expressions and avoid constructing results before it's necessary.
-func exprResult(query, expression string, result storage.Result) (exprResult storage.Result) {
+func exprResult(
+	query, expression string,
+	result, prevResult storage.Result,
+) (newResult storage.Result, err error) {
 	var (
 		env     map[string]interface{} // Environment to provide for an expression.
-		err     error                  // General error holder.
 		output  interface{}            // Output from an expression.
 		program *vm.Program            // Expression executable.
 	)
 
+	// Construct the expression environment.
 	env = map[string]interface{}{
-		"result": result.Map(store.GetLabels(query, []string{})),
+		"prevResult": prevResult.Map(store.GetLabels(query, []string{})),
+		"result":     result.Map(store.GetLabels(query, []string{})),
 	}
-	slog.Debug("Expr result", "query", query, "result", result, "expression", expression)
-	slog.Debug("Expr end", "env", env)
+	slog.Debug("Expression executing", "query", query, "expression", expression, "env", env)
 
 	// Execute any expression.
 	program, err = expr.Compile(expression, expr.Env(env))
 	if err != nil {
-		e(err)
+		slog.Error("Failed to compile expression", "expr", expression, "env", env)
+		return result, err
 	}
 	output, err = expr.Run(program, env)
-	if env != nil {
-		e(err)
+	if err != nil {
+		slog.Error("Expression failed to execute", "expr", expression, "env", env)
+		return result, err
 	}
 
 	// Re-define result based on the expression output.
 	switch output.(type) {
+	case bool:
+		newResult = storage.Result{
+			Time:   result.Time,
+			Value:  strconv.FormatBool(output.(bool)),
+			Values: storage.Values{strconv.FormatBool(output.(bool))},
+		}
 	case int:
-		exprResult = storage.Result{
+		newResult = storage.Result{
 			Time:   result.Time,
 			Value:  strconv.Itoa(output.(int)),
 			Values: storage.Values{strconv.Itoa(output.(int))},
 		}
 	case int64:
-		exprResult = storage.Result{
+		newResult = storage.Result{
 			Time:   result.Time,
 			Value:  strconv.FormatInt(output.(int64), 10),
 			Values: storage.Values{strconv.FormatInt(output.(int64), 10)},
 		}
 	case float64:
-		exprResult = storage.Result{
+		newResult = storage.Result{
 			Time:   result.Time,
 			Value:  strconv.FormatFloat(output.(float64), 'f', -1, 64),
 			Values: storage.Values{strconv.FormatFloat(output.(float64), 'f', -1, 64)},
 		}
 	default:
-		exprResult = storage.Result{
+		newResult = storage.Result{
 			Time:   result.Time,
 			Value:  output.(string),
 			Values: storage.Values{output.(string)},
@@ -119,35 +130,39 @@ func AddResult(query, result string, history bool) {
 }
 
 // Get results previous to the last read result.
-func GetPrevResults(query string, filters, expressions []string) (results []storage.Result) {
+func GetPrevResults(query string, filters []string) (results []storage.Result) {
 	slog.Debug("Fetching previous results", "query", query)
 
 	// Retrieve previous results.
-	results = store.GetToIndex(query, filters, readerIndexes[query])
-
-	// Process any expressions on the result.
-	for i, _ := range results {
-		for _, expression := range expressions {
-			results[i] = exprResult(query, expression, results[i])
-		}
-	}
-
-	return
+	return store.GetToIndex(query, filters, readerIndexes[query])
 }
 
 // Retrieves a next result.
-func GetResult(query string, filters, expressions []string) (result storage.Result) {
+func GetResult(query string, filters []string) (result storage.Result) {
 	slog.Debug("Fetching next result", "query", query)
 
-	// Retrieve the next result.
-	result = store.Next(query, filters, readerIndexes[query])
+	return store.Next(query, filters, readerIndexes[query])
+}
+
+// Returns a result after applying expressions. Requires a previous result for calculations
+// requiring history. It is expected that a query
+// and so expressions will only be possible once at least one result has compiled.
+func ExprResult(
+	query string,
+	expressions []string,
+	result, prevResult storage.Result,
+) storage.Result {
+	var err error // General error holder.
 
 	// Process any expressions on the result.
 	for _, expression := range expressions {
-		result = exprResult(query, expression, result)
+		result, err = exprResult(query, expression, result, prevResult)
+		if err != nil {
+			e(err)
+		}
 	}
 
-	return
+	return result
 }
 
 // Retrieves a next result, waiting for a non-empty return in a non-blocking manner.
@@ -295,10 +310,10 @@ func Results(
 		switch displayMode {
 		case DISPLAY_MODE_RAW:
 			driver = DISPLAY_RAW
-			RawDisplay(query, filters)
+			RawDisplay(query, filters, expressions)
 		case DISPLAY_MODE_STREAM:
 			driver = DISPLAY_TVIEW
-			StreamDisplay(query, filters, displayConfig)
+			StreamDisplay(query, filters, expressions, displayConfig)
 		case DISPLAY_MODE_TABLE:
 			driver = DISPLAY_TVIEW
 			TableDisplay(query, filters, expressions, displayConfig)
@@ -311,7 +326,7 @@ func Results(
 				slog.Warn("Graph mode can only apply one filter; ignoring all but the first")
 			}
 			driver = DISPLAY_TERMDASH
-			GraphDisplay(query, filters[0], displayConfig)
+			GraphDisplay(query, filters[0], expressions, displayConfig)
 		default:
 			slog.Error("Invalid result driver", "displayMode", displayMode)
 			os.Exit(1)

@@ -5,6 +5,7 @@ package lib
 
 import (
 	"fmt"
+	_ "log/slog"
 	"strconv"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/mum4k/termdash/widgets/sparkline"
 	"github.com/rivo/tview"
 
-	_ "github.com/spacez320/cryptarch/pkg/storage"
+	"github.com/spacez320/cryptarch/pkg/storage"
 )
 
 // General configuration for display modes.
@@ -111,8 +112,10 @@ func NewDisplayConfig() *DisplayConfig {
 }
 
 // Presents raw output.
-func RawDisplay(query string, filters []string) {
+func RawDisplay(query string, filters, expressions []string) {
 	var (
+		nextResult, prevResult storage.Result // Results tracking.
+
 		reader = readerIndexes[query] // Reader index for the query.
 	)
 
@@ -122,17 +125,32 @@ func RawDisplay(query string, filters []string) {
 
 	// Load existing results.
 	for _, result := range store.GetToIndex(query, filters, reader) {
+		// Execute any expressions.
+		if len(expressions) > 0 {
+			result = ExprResult(query, expressions, result, prevResult)
+		}
+
 		fmt.Println(result)
+
+		prevResult = result
 	}
 
 	// Load new results.
 	for {
-		fmt.Println(GetResult(query, filters, []string{}))
+		// Get a result and execute expressions.
+		nextResult = GetResult(query, filters)
+		if len(expressions) > 0 {
+			nextResult = ExprResult(query, expressions, nextResult, prevResult)
+		}
+
+		fmt.Println(nextResult)
+
+		prevResult = nextResult
 	}
 }
 
 // Update the results pane with new results as they are generated.
-func StreamDisplay(query string, filters []string, displayConfig *DisplayConfig) {
+func StreamDisplay(query string, filters, expressions []string, displayConfig *DisplayConfig) {
 	var (
 		widgets tviewWidgets // Widgets produced by tview.
 
@@ -150,9 +168,21 @@ func StreamDisplay(query string, filters []string, displayConfig *DisplayConfig)
 	display(
 		DISPLAY_TVIEW,
 		func() {
+			var (
+				nextResult, prevResult storage.Result // Results tracking.
+			)
+
 			// Load existing results.
 			for _, result := range store.GetToIndex(query, filters, reader) {
+				// Execute any expressions.
+				if len(expressions) > 0 {
+					result = ExprResult(query, expressions, result, prevResult)
+				}
+
+				// Display the next result.
 				fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), result.Values)
+
+				prevResult = result
 			}
 
 			// Load new results.
@@ -166,11 +196,16 @@ func StreamDisplay(query string, filters []string, displayConfig *DisplayConfig)
 					// We've received a pause and need to wait for an unpause.
 					<-pauseDisplayChan
 				default:
+					// Get a result and execute expressions.
+					nextResult = GetResult(query, filters)
+					if len(expressions) > 0 {
+						nextResult = ExprResult(query, expressions, nextResult, prevResult)
+					}
+
 					// We can display the next result.
-					fmt.Fprintln(
-						widgets.resultsWidget.(*tview.TextView),
-						GetResult(query, filters, []string{}).Values,
-					)
+					fmt.Fprintln(widgets.resultsWidget.(*tview.TextView), nextResult.Values)
+
+					prevResult = nextResult
 				}
 			}
 		},
@@ -180,7 +215,7 @@ func StreamDisplay(query string, filters []string, displayConfig *DisplayConfig)
 // Creates a table of results for the results pane.
 func TableDisplay(query string, filters, expressions []string, displayConfig *DisplayConfig) {
 	var (
-		labels  []string     // Labels to use for display.
+		labels  []string     // Labels to use for displaying.
 		widgets tviewWidgets // Widgets produced by tview.
 
 		cellContentParser = func(value interface{}) (cellContent string) {
@@ -202,13 +237,12 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 	GetResultWait(query)
 	reader.Dec()
 
-	// Determine labels to display, based on the presence of expressions. Expressions always map to a
-	// single variable.
+	// Determine labels to display as part of the table, based on the presence of expressions.
 	if len(expressions) > 0 {
 		// Expressions provide single-value results--apply a generic label.
 		labels = []string{"results"}
 	} else {
-		// Get all labels.
+		// Get labels according to filters.
 		labels = store.GetLabels(query, filters)
 	}
 
@@ -219,7 +253,11 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 	display(
 		DISPLAY_TVIEW,
 		func() {
-			i := 0 // Used to determine the next row index.
+			var (
+				nextResult, prevResult storage.Result // Results tracking.
+
+				i = 0 // Used to determine the next row index.
+			)
 
 			// Load table header.
 			appTview.QueueUpdateDraw(func() {
@@ -232,14 +270,23 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 			i += 1
 
 			// Load existing results.
-			for _, result := range GetPrevResults(query, filters, expressions) {
+			for _, result := range GetPrevResults(query, filters) {
 				appTview.QueueUpdateDraw(func() {
 					row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
+
+					// Execute any expressions.
+					if len(expressions) > 0 {
+						result = ExprResult(query, expressions, result, prevResult)
+					}
+
+					// Load results into the next row.
 					for j, value := range result.Values {
 						row.SetCellSimple(i, j, tableCellPadding+cellContentParser(value)+tableCellPadding)
 					}
+
+					prevResult = result
+					i += 1
 				})
-				i += 1
 			}
 
 			// Load new results.
@@ -256,11 +303,21 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 					// We can display the next result.
 					appTview.QueueUpdateDraw(func() {
 						row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
-						for j, value := range GetResult(query, filters, expressions).Values {
+
+						// Get a result and execute expressions.
+						nextResult = GetResult(query, filters)
+						if len(expressions) > 0 {
+							nextResult = ExprResult(query, expressions, GetResult(query, filters), prevResult)
+						}
+
+						// Display something if we have something.
+						for j, value := range nextResult.Values {
 							row.SetCellSimple(i, j, tableCellPadding+cellContentParser(value)+tableCellPadding)
 						}
+
+						prevResult = nextResult
+						i += 1
 					})
-					i += 1
 				}
 			}
 		},
@@ -268,7 +325,7 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 }
 
 // Creates a graph of results for the results pane.
-func GraphDisplay(query string, filter string, displayConfig *DisplayConfig) {
+func GraphDisplay(query string, filter string, expressions []string, displayConfig *DisplayConfig) {
 	var (
 		err error // General error holder.
 
@@ -310,9 +367,26 @@ func GraphDisplay(query string, filter string, displayConfig *DisplayConfig) {
 	display(
 		DISPLAY_TERMDASH,
 		func() {
+			var (
+				nextResult, prevResult storage.Result // Results tracking.
+				value                  float64        // Value to ultimately display.
+			)
+
 			// Load existing results.
 			for _, result := range store.GetToIndex(query, []string{filter}, reader) {
-				widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(result.Values[0]))
+				// Execute any expressions.
+				if len(expressions) > 0 {
+					result = ExprResult(query, expressions, result, prevResult)
+					// Expressions always return a string, so always try to convert it into a float.
+					value, _ = strconv.ParseFloat(result.Values[0].(string), 10)
+					widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
+				} else {
+					// Use typless assignment to account for various numeric values.
+					value := result.Values[0]
+					widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
+				}
+
+				prevResult = result
 			}
 
 			// Load new results.
@@ -326,10 +400,21 @@ func GraphDisplay(query string, filter string, displayConfig *DisplayConfig) {
 					// We've received a pause and need to wait for an unpause.
 					<-pauseDisplayChan
 				default:
-					// We can display the next result.
-					value := GetResult(query, []string{filter}, []string{}).Values[0]
-					widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
+					// Get a result and execute expressions.
+					nextResult = GetResult(query, []string{filter})
+					if len(expressions) > 0 {
+						nextResult = ExprResult(query, expressions, nextResult, prevResult)
+						// Expressions always return a string, so always try to convert it into a float.
+						value, _ = strconv.ParseFloat(nextResult.Values[0].(string), 10)
+						widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
+					} else {
+						// Use typless assignment to account for various numeric values.
+						value := nextResult.Values[0]
+						widgets.resultsWidget.(*sparkline.SparkLine).Add(sparkParser(value))
+					}
 				}
+
+				prevResult = nextResult
 			}
 		},
 	)

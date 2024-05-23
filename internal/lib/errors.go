@@ -3,7 +3,9 @@
 
 package lib
 
-import "log/slog"
+import (
+	"log/slog"
+)
 
 // General error manager.
 func e(err error) {

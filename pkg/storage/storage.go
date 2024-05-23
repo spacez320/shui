@@ -240,7 +240,7 @@ func (s *Storage) Put(
 	result = (*s).Results[query].put(value, values...)
 
 	slog.Debug(
-		"Placing results in storage",
+		"Storing results",
 		"value",
 		value,
 		"values",
