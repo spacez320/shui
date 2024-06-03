@@ -63,13 +63,16 @@ func filterResult(query string, filters, labels []string, result Result) (filter
 }
 
 // Pick items from an arbitrary slice according to provided indexes. If indexes is empty, it will
-// just return the original slice.
+// just return the original slice. It is possible to request indexes outside the range of in, which
+// will be ignored.
 func filterSlice[T interface{}](in []T, indexes []int) (out []T) {
 	if len(indexes) == 0 {
 		out = in
 	} else {
 		for _, index := range indexes {
-			out = append(out, in[index])
+			if len(in) > index {
+				out = append(out, in[index])
+			}
 		}
 	}
 
@@ -211,6 +214,8 @@ func (s *Storage) Next(query string, filters []string, reader *ReaderIndex) (nex
 	next = <-(*s).putEventChans[query]
 	reader.Inc()
 
+	slog.Debug("Received next from channel", "result", next)
+
 	// Apply filters.
 	next = filterResult(query, filters, (*s).Results[query].Labels, next)
 
@@ -241,13 +246,17 @@ func (s *Storage) Put(
 
 	slog.Debug(
 		"Storing results",
-		"value",
-		value,
-		"values",
-		values,
+		"query",
+		query,
+		"result",
+		result,
 		"labels",
 		(*s).Results[query].Labels,
 	)
+
+	if result.IsEmptyValues() {
+		slog.Warn("Storing empty result", "query", query)
+	}
 
 	// Send a non-blocking put event. Put events are lossy and clients may lose information if not
 	// actively listening.

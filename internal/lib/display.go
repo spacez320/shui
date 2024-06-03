@@ -5,7 +5,7 @@ package lib
 
 import (
 	"fmt"
-	_ "log/slog"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -139,6 +139,7 @@ func RawDisplay(query string, filters, expressions []string) {
 	for {
 		// Get a result and execute expressions.
 		nextResult = GetResult(query, filters)
+
 		if len(expressions) > 0 {
 			nextResult = ExprResult(query, expressions, nextResult, prevResult)
 		}
@@ -271,7 +272,14 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 
 			// Load existing results.
 			for _, result := range GetPrevResults(query, filters) {
+				// We can display the next result.
 				appTview.QueueUpdateDraw(func() {
+					if result.IsEmptyValues() {
+						slog.Warn("Cannot display an empty result", "query", query)
+						// Ignore empty results.
+						return
+					}
+
 					row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
 
 					// Execute any expressions.
@@ -302,12 +310,18 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 				default:
 					// We can display the next result.
 					appTview.QueueUpdateDraw(func() {
-						row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
-
 						// Get a result and execute expressions.
 						nextResult = GetResult(query, filters)
+						if nextResult.IsEmptyValues() {
+							slog.Warn("Cannot display an empty result", "query", query)
+							// Ignore empty results.
+							return
+						}
+
+						row := widgets.resultsWidget.(*tview.Table).InsertRow(i) // Row to contain the result.
+
 						if len(expressions) > 0 {
-							nextResult = ExprResult(query, expressions, GetResult(query, filters), prevResult)
+							nextResult = ExprResult(query, expressions, nextResult, prevResult)
 						}
 
 						// Display something if we have something.
@@ -374,6 +388,12 @@ func GraphDisplay(query string, filter string, expressions []string, displayConf
 
 			// Load existing results.
 			for _, result := range store.GetToIndex(query, []string{filter}, reader) {
+				if result.IsEmptyValues() {
+					slog.Warn("Cannot display an empty result", "query", query)
+					// Ignore empty results.
+					continue
+				}
+
 				// Execute any expressions.
 				if len(expressions) > 0 {
 					result = ExprResult(query, expressions, result, prevResult)
@@ -402,6 +422,13 @@ func GraphDisplay(query string, filter string, expressions []string, displayConf
 				default:
 					// Get a result and execute expressions.
 					nextResult = GetResult(query, []string{filter})
+
+					if nextResult.IsEmptyValues() {
+						slog.Warn("Cannot display an empty result", "query", query)
+						// Ignore empty results.
+						continue
+					}
+
 					if len(expressions) > 0 {
 						nextResult = ExprResult(query, expressions, nextResult, prevResult)
 						// Expressions always return a string, so always try to convert it into a float.

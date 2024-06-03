@@ -39,6 +39,11 @@ func (r *Result) IsEmpty() bool {
 	return reflect.DeepEqual(*r, Result{})
 }
 
+// Determines whether this result contains empty values.
+func (r *Result) IsEmptyValues() bool {
+	return (*r).Value == "" && len((*r).Values) == 0
+}
+
 // Returns a map of values keyed to their labels.
 func (r *Result) Map(labels []string) map[string]interface{} {
 	resultMap := make(map[string]interface{}, len(r.Values))

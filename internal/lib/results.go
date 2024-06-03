@@ -102,12 +102,17 @@ func exprResult(
 			Value:  strconv.FormatFloat(output.(float64), 'f', -1, 64),
 			Values: storage.Values{strconv.FormatFloat(output.(float64), 'f', -1, 64)},
 		}
-	default:
+	case string:
 		newResult = storage.Result{
 			Time:   result.Time,
 			Value:  output.(string),
 			Values: storage.Values{output.(string)},
 		}
+	default:
+		slog.Warn("Expression output not supported", "expr", expression, "env", env, "output", output)
+		// The output type isn't one that may be processed by an expression (like nil), so return the
+		// result unmodified.
+		newResult = result
 	}
 
 	return

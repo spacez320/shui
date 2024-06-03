@@ -239,7 +239,7 @@ func initDisplayTermdash(
 					container.Border(linestyle.Light),
 					container.BorderTitle("Logs"),
 					container.BorderTitleAlignCenter(),
-					container.PlaceWidget(logsWidgetWriter.text),
+					container.PlaceWidget(widgets.logsWidget),
 				),
 				// XXX The -1 is to try to match tview's proportions.
 				container.SplitOption(
