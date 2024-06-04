@@ -260,9 +260,10 @@ func Results(
 	resultsReadyChan chan bool,
 ) {
 	var (
-		err         error                      // General error holder.
-		pushgateway storage.PushgatewayStorage // Pushgateway configuration.
-		prometheus  storage.PrometheusStorage  // Prometheus configuration.
+		err           error                        // General error holder.
+		elasticsearch storage.ElasticsearchStorage // Elasticsearch configuration.
+		pushgateway   storage.PushgatewayStorage   // Pushgateway configuration.
+		prometheus    storage.PrometheusStorage    // Prometheus configuration.
 
 		expressions = ctx.Value("expressions").([]string) // Capture expressions from context.
 		filters     = ctx.Value("filters").([]string)     // Capture filters from context.
@@ -283,6 +284,10 @@ func Results(
 	defer store.Close()
 
 	// Initialize external storage.
+	if config.ElasticsearchAddr != "" {
+		elasticsearch = storage.NewElasticsearchStorage(config.ElasticsearchAddr)
+		store.AddExternalStorage(&elasticsearch)
+	}
 	if config.PushgatewayAddr != "" {
 		pushgateway = storage.NewPushgatewayStorage(config.PushgatewayAddr)
 		store.AddExternalStorage(&pushgateway)

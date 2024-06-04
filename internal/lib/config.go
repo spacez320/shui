@@ -17,6 +17,7 @@ var (
 // Shareable configuration. See CLI flags for further details.
 type Config struct {
 	Count, Delay, DisplayMode, Mode       int
+	ElasticsearchAddr                     string
 	Expressions, Filters, Labels, Queries []string
 	History, LogMulti, Silent             bool
 	LogLevel                              string

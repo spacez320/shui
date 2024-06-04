@@ -40,6 +40,16 @@ type externalStorage interface {
 	Put(query string, labels []string, result Result) error
 }
 
+type ElasticsearchStorage struct {
+	address string // Address to connect to Elasticsearch.
+}
+
+func (e *ElasticsearchStorage) Put(query string, labels []string, result Result) error {
+	slog.Debug("Pushing to Elasticsearch", "result", result)
+
+	return nil
+}
+
 // Prometheus Pushgateway specific external storage system.
 type PushgatewayStorage struct {
 	address  string               // Address to connect to Pushgateway.
@@ -55,6 +65,7 @@ func (p *PushgatewayStorage) Put(query string, labels []string, result Result) e
 
 		name = queryToPromMetricName(query) // Name for the metric.
 	)
+
 	// Get the instance value.
 	instance, err = getPromInstance()
 	if err != nil {
@@ -174,6 +185,13 @@ func resultToPromMetric(
 	return
 }
 
+// Creates a new storage for Elasticsearch.
+func NewElasticsearchStorage(address string) ElasticsearchStorage {
+	return ElasticsearchStorage{
+		address: address,
+	}
+}
+
 // Create a new storage for Prometheus.
 func NewPrometheusStorage(address string) PrometheusStorage {
 	var registry = prometheus.NewRegistry()
@@ -189,7 +207,6 @@ func NewPrometheusStorage(address string) PrometheusStorage {
 
 // Create a new storage for Pushgateway.
 func NewPushgatewayStorage(address string) PushgatewayStorage {
-
 	return PushgatewayStorage{
 		address:  address,
 		registry: prometheus.NewRegistry(),

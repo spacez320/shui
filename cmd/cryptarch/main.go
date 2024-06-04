@@ -47,6 +47,7 @@ var (
 	count               int      // Number of attempts to execute the query.
 	delay               int      // Delay between queries.
 	displayMode         int      // Result mode to display.
+	elasticsearchAddr   string   // Address for Elasticsearch.
 	expressions         multiArg // Expression to apply to output.
 	filters             string   // Result filters.
 	history             bool     // Whether or not to preserve or use historical results.
@@ -101,6 +102,8 @@ func main() {
 	flag.IntVar(&outerPaddingLeft, "outer-padding-left", -1, "Left display padding.")
 	flag.IntVar(&outerPaddingRight, "outer-padding-right", -1, "Right display padding.")
 	flag.IntVar(&outerPaddingTop, "outer-padding-top", -1, "Top display padding.")
+	flag.StringVar(&elasticsearchAddr, "elasticsearch-addr", "",
+		"Address to present Elasticsearch document updates.")
 	flag.StringVar(&filters, "filters", "", "Results filters.")
 	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
 	flag.StringVar(&logFile, "log-file", "", "Log file to write to.")
@@ -110,7 +113,7 @@ func main() {
 		"Address to present Prometheus metrics.")
 	flag.StringVar(&promPushgatewayAddr, "prometheus-pushgateway", "",
 		"Address for Prometheus Pushgateway.")
-	flag.Var(&expressions, "expr", "Expression to apply to output.")
+	flag.Var(&expressions, "expr", "Expression to apply to output. Can be supplied multiple times.")
 	flag.Var(&queries, "query", "Query to execute. Can be supplied multiple times. When in query "+
 		"mode, this is expected to be some command. When in profile mode it is expected to be PID. "+
 		"At least one query must be provided.")
@@ -152,6 +155,7 @@ func main() {
 		Count:                  count,
 		Delay:                  delay,
 		DisplayMode:            displayMode,
+		ElasticsearchAddr:      elasticsearchAddr,
 		Expressions:            expressions,
 		Filters:                parseCommaDelimitedStrOrEmpty(filters),
 		History:                history,

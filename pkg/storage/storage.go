@@ -14,11 +14,13 @@ package storage
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sync"
 	"time"
@@ -128,6 +130,7 @@ func (s *Storage) save() error {
 
 // Adds an external storage.
 func (s *Storage) AddExternalStorage(e externalStorage) {
+	slog.Debug(fmt.Sprintf("Enabled external storage %v", reflect.TypeOf(e)))
 	(*s).externalStorages = append((*s).externalStorages, e)
 }
 
