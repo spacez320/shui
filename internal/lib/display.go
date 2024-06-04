@@ -275,8 +275,8 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 				// We can display the next result.
 				appTview.QueueUpdateDraw(func() {
 					if result.IsEmptyValues() {
-						slog.Warn("Cannot display an empty result", "query", query)
 						// Ignore empty results.
+						slog.Warn("Cannot display an empty result", "query", query)
 						return
 					}
 
@@ -313,8 +313,8 @@ func TableDisplay(query string, filters, expressions []string, displayConfig *Di
 						// Get a result and execute expressions.
 						nextResult = GetResult(query, filters)
 						if nextResult.IsEmptyValues() {
-							slog.Warn("Cannot display an empty result", "query", query)
 							// Ignore empty results.
+							slog.Warn("Cannot display an empty result", "query", query)
 							return
 						}
 
@@ -389,8 +389,8 @@ func GraphDisplay(query string, filter string, expressions []string, displayConf
 			// Load existing results.
 			for _, result := range store.GetToIndex(query, []string{filter}, reader) {
 				if result.IsEmptyValues() {
-					slog.Warn("Cannot display an empty result", "query", query)
 					// Ignore empty results.
+					slog.Warn("Cannot display an empty result", "query", query)
 					continue
 				}
 
@@ -424,8 +424,8 @@ func GraphDisplay(query string, filter string, expressions []string, displayConf
 					nextResult = GetResult(query, []string{filter})
 
 					if nextResult.IsEmptyValues() {
-						slog.Warn("Cannot display an empty result", "query", query)
 						// Ignore empty results.
+						slog.Warn("Cannot display an empty result", "query", query)
 						continue
 					}
 

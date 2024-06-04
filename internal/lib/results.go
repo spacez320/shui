@@ -109,9 +109,9 @@ func exprResult(
 			Values: storage.Values{output.(string)},
 		}
 	default:
-		slog.Warn("Expression output not supported", "expr", expression, "env", env, "output", output)
 		// The output type isn't one that may be processed by an expression (like nil), so return the
 		// result unmodified.
+		slog.Warn("Expression output not supported", "expr", expression, "env", env, "output", output)
 		newResult = result
 	}
 
