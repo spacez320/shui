@@ -285,7 +285,12 @@ func Results(
 
 	// Initialize external storage.
 	if config.ElasticsearchAddr != "" {
-		elasticsearch = storage.NewElasticsearchStorage(config.ElasticsearchAddr)
+		elasticsearch = storage.NewElasticsearchStorage(
+			config.ElasticsearchAddr,
+			config.ElasticsearchIndex,
+			config.ElasticsearchPassword,
+			config.ElasticsearchUser,
+		)
 		store.AddExternalStorage(&elasticsearch)
 	}
 	if config.PushgatewayAddr != "" {

@@ -97,22 +97,61 @@ cryptarch \
 Cryptarch can send its data off to external systems, making it useful as an ad-hoc metrics or log
 exporter. Supported integrations are listed below.
 
+#### Elasticsearch
+
+Cryptarch can create Elasticsearch documents from results.
+
+```sh
+cryptarch \
+    -elasticsearch-addr <addr> \
+    -elasticsearch-index <index> \
+    -elasticsearch-user <user> \
+    -elasticsearch-password <password
+```
+
+- Documents are structured according to result labels supplied with `-labels`, prefixed with
+  `cryptarch.value.`.
+- Documents will also contain an additional field, `cryptarch.query`.
+- The result `Time` field will be mapped to `timestamp`.
+- Cryptarch must use HTTP Basic Auth (credentials are given with `-elasticsearch-user` and
+  `-elasticsearch-password`).
+- Cryptarch will not attempt to create an index (one must be supplied with `-elasticsearch-index`).
+
+As an example, given a query `cat file.txt | wc` and `-labels "newline,words,bytes"`, the following
+Elasticsearch document would be created:
+
+```json
+{
+    "_index": "some-index",
+    "_id": "some-id",
+    "_score": 1.0,
+    "_source": {
+        "cryptarch.query": "cat file.txt | wc",
+        "cryptarch.value.bytes": 3,
+        "cryptarch.value.newline": 1,
+        "cryptarch.value.words": 2,
+        "timestamp": "2024-06-10T17:40:29.773550719-04:00"
+    }
+}
+```
+
 #### Prometheus
 
-Both normal Prometheus collection and Pushgateway are supported.
+Cryptarch can create Prometheus metrics from numerical results. Both normal Prometheus collection
+and Pushgateway are supported.
 
 ```sh
 # Start a Prometheus collection HTTP page.
-cryptarch --prometheus-exporter <address>
+cryptarch -prometheus-exporter <address>
 
 # Specify a Prometheus Pushgateway address to send results to.
-cryptarch --prometheus-pushgateway <address>
+cryptarch -prometheus-pushgateway <address>
 ```
 
-- Metrics name will have the structure `cryptarch_<query>` where `<query>` will be changed to
+- Metrics namse will have the structure `cryptarch_<query>` where `<query>` will be changed to
   conform to Prometheus naming rules.
-- Cryptarch labels supplied with the `-labels` will be saved as a Prometheus label called
-  `cryptarch_label`.
+- Cryptarch labels supplied with `-labels` will be saved as a Prometheus label called
+  `cryptarch_label`, creating a unique series for each value in a series of results.
 
 As an example, given a query `cat file.txt | wc`, and `-labels "newline,words,bytes"`, the following
 Prometheus metrics would be created:

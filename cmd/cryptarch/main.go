@@ -44,29 +44,32 @@ const (
 )
 
 var (
-	count               int      // Number of attempts to execute the query.
-	delay               int      // Delay between queries.
-	displayMode         int      // Result mode to display.
-	elasticsearchAddr   string   // Address for Elasticsearch.
-	expressions         multiArg // Expression to apply to output.
-	filters             string   // Result filters.
-	history             bool     // Whether or not to preserve or use historical results.
-	labels              string   // Result value labels.
-	logFile             string   // Log filte to write to.
-	logLevel            string   // Log level.
-	mode                int      // Mode to execute in.
-	outerPaddingBottom  int      // Bottom padding settings.
-	outerPaddingLeft    int      // Left padding settings.
-	outerPaddingRight   int      // Right padding settings.
-	outerPaddingTop     int      // Top padding settings.
-	port                string   // Port for RPC.
-	promExporterAddr    string   // Address for Prometheus metrics page.
-	promPushgatewayAddr string   // Address for Prometheus Pushgateway.
-	queries             multiArg // Queries to execute.
-	showHelp            bool     // Whether or not to show helpt
-	showLogs            bool     // Whether or not to show logs.
-	showStatus          bool     // Whether or not to show statuses.
-	silent              bool     // Whether or not to be quiet.
+	count                 int      // Number of attempts to execute the query.
+	delay                 int      // Delay between queries.
+	displayMode           int      // Result mode to display.
+	elasticsearchAddr     string   // Address for Elasticsearch.
+	elasticsearchIndex    string   // Index to use for Elasticsearch documents.
+	elasticsearchPassword string   // Password for Elasticsearch basic auth.
+	elasticsearchUser     string   // User for Elasticsearch basic auth.
+	expressions           multiArg // Expression to apply to output.
+	filters               string   // Result filters.
+	history               bool     // Whether or not to preserve or use historical results.
+	labels                string   // Result value labels.
+	logFile               string   // Log filte to write to.
+	logLevel              string   // Log level.
+	mode                  int      // Mode to execute in.
+	outerPaddingBottom    int      // Bottom padding settings.
+	outerPaddingLeft      int      // Left padding settings.
+	outerPaddingRight     int      // Right padding settings.
+	outerPaddingTop       int      // Top padding settings.
+	port                  string   // Port for RPC.
+	promExporterAddr      string   // Address for Prometheus metrics page.
+	promPushgatewayAddr   string   // Address for Prometheus Pushgateway.
+	queries               multiArg // Queries to execute.
+	showHelp              bool     // Whether or not to show helpt
+	showLogs              bool     // Whether or not to show logs.
+	showStatus            bool     // Whether or not to show statuses.
+	silent                bool     // Whether or not to be quiet.
 
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
@@ -104,6 +107,13 @@ func main() {
 	flag.IntVar(&outerPaddingTop, "outer-padding-top", -1, "Top display padding.")
 	flag.StringVar(&elasticsearchAddr, "elasticsearch-addr", "",
 		"Address to present Elasticsearch document updates.")
+	flag.StringVar(&elasticsearchIndex, "elasticsearch-index", "",
+		"Index to use for Elasticsearch document updates. It is expected that the index already "+
+			"exists or will automatically be created.")
+	flag.StringVar(&elasticsearchPassword, "elasticsearch-password", "",
+		"Password to use for Elasticsearch basic auth.")
+	flag.StringVar(&elasticsearchUser, "elasticsearch-user", "",
+		"User to use for Elasticsearch basic auth.")
 	flag.StringVar(&filters, "filters", "", "Results filters.")
 	flag.StringVar(&labels, "labels", "", "Labels to apply to query values, separated by commas.")
 	flag.StringVar(&logFile, "log-file", "", "Log file to write to.")
@@ -156,6 +166,9 @@ func main() {
 		Delay:                  delay,
 		DisplayMode:            displayMode,
 		ElasticsearchAddr:      elasticsearchAddr,
+		ElasticsearchIndex:     elasticsearchIndex,
+		ElasticsearchPassword:  elasticsearchPassword,
+		ElasticsearchUser:      elasticsearchUser,
 		Expressions:            expressions,
 		Filters:                parseCommaDelimitedStrOrEmpty(filters),
 		History:                history,
