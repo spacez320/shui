@@ -102,12 +102,17 @@ func exprResult(
 			Value:  strconv.FormatFloat(output.(float64), 'f', -1, 64),
 			Values: storage.Values{strconv.FormatFloat(output.(float64), 'f', -1, 64)},
 		}
-	default:
+	case string:
 		newResult = storage.Result{
 			Time:   result.Time,
 			Value:  output.(string),
 			Values: storage.Values{output.(string)},
 		}
+	default:
+		// The output type isn't one that may be processed by an expression (like nil), so return the
+		// result unmodified.
+		slog.Warn("Expression output not supported", "expr", expression, "env", env, "output", output)
+		newResult = result
 	}
 
 	return
@@ -255,9 +260,10 @@ func Results(
 	resultsReadyChan chan bool,
 ) {
 	var (
-		err         error                      // General error holder.
-		pushgateway storage.PushgatewayStorage // Pushgateway configuration.
-		prometheus  storage.PrometheusStorage  // Prometheus configuration.
+		err           error                        // General error holder.
+		elasticsearch storage.ElasticsearchStorage // Elasticsearch configuration.
+		pushgateway   storage.PushgatewayStorage   // Pushgateway configuration.
+		prometheus    storage.PrometheusStorage    // Prometheus configuration.
 
 		expressions = ctx.Value("expressions").([]string) // Capture expressions from context.
 		filters     = ctx.Value("filters").([]string)     // Capture filters from context.
@@ -278,6 +284,15 @@ func Results(
 	defer store.Close()
 
 	// Initialize external storage.
+	if config.ElasticsearchAddr != "" {
+		elasticsearch = storage.NewElasticsearchStorage(
+			config.ElasticsearchAddr,
+			config.ElasticsearchIndex,
+			config.ElasticsearchPassword,
+			config.ElasticsearchUser,
+		)
+		store.AddExternalStorage(&elasticsearch)
+	}
 	if config.PushgatewayAddr != "" {
 		pushgateway = storage.NewPushgatewayStorage(config.PushgatewayAddr)
 		store.AddExternalStorage(&pushgateway)

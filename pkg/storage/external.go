@@ -4,6 +4,9 @@
 package storage
 
 import (
+	"bytes"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -11,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
@@ -40,6 +44,71 @@ type externalStorage interface {
 	Put(query string, labels []string, result Result) error
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// ElasticsearchStorage
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+type ElasticsearchStorage struct {
+	address  string // Address to connect to Elasticsearch.
+	index    string // Index to supply documents to.
+	user     string // Username for HTTP Baisc Auth.
+	password string // Password for HTTP Baisc Auth.
+}
+
+func (e *ElasticsearchStorage) Put(query string, labels []string, result Result) error {
+	var (
+		es      *elasticsearch.Client // Client for querying Elasticsearch.
+		payload []byte                // Query payload to turn results into documents.
+
+		// Configuration for the Elasticsearch client.
+		esConfig = elasticsearch.Config{
+			Addresses: []string{e.address},
+			Username:  e.user,
+			Password:  e.password,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
+	)
+
+	// Initialize an Elasticsearch client.
+	es, err := elasticsearch.NewClient(esConfig)
+	if err != nil {
+		return err
+	}
+
+	// Build the document body.
+	payload, err = resultToElasticsearchDocument(query, labels, result)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Pushing to Elasticsearch", "result", result)
+	es.Index(e.index, bytes.NewReader(payload))
+
+	return nil
+}
+
+// Creates a new storage for Elasticsearch.
+func NewElasticsearchStorage(address, index, password, user string) ElasticsearchStorage {
+	return ElasticsearchStorage{
+		address:  address,
+		index:    index,
+		password: password,
+		user:     user,
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// PushgatewayStorage
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Prometheus Pushgateway specific external storage system.
 type PushgatewayStorage struct {
 	address  string               // Address to connect to Pushgateway.
@@ -55,6 +124,7 @@ func (p *PushgatewayStorage) Put(query string, labels []string, result Result) e
 
 		name = queryToPromMetricName(query) // Name for the metric.
 	)
+
 	// Get the instance value.
 	instance, err = getPromInstance()
 	if err != nil {
@@ -73,6 +143,20 @@ func (p *PushgatewayStorage) Put(query string, labels []string, result Result) e
 
 	return nil
 }
+
+// Create a new storage for Pushgateway.
+func NewPushgatewayStorage(address string) PushgatewayStorage {
+	return PushgatewayStorage{
+		address:  address,
+		registry: prometheus.NewRegistry(),
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// PrometheusStorage
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type PrometheusStorage struct {
 	registry *prometheus.Registry // Prometheus registry to use.
@@ -98,6 +182,25 @@ func (p *PrometheusStorage) Put(query string, labels []string, result Result) er
 
 	return nil
 }
+
+// Create a new storage for Prometheus.
+func NewPrometheusStorage(address string) PrometheusStorage {
+	var registry = prometheus.NewRegistry()
+
+	// Start the metrics endpoint for results.
+	http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}))
+	go http.ListenAndServe(address, nil)
+
+	return PrometheusStorage{
+		registry: registry,
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Private Functions
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Get an instance value for Prometheus metrics.
 func getPromInstance() (localIP string, err error) {
@@ -134,6 +237,31 @@ func queryToPromMetricName(query string) string {
 		prometheus_metric_name_replace_regexp.ReplaceAll([]byte(query), []byte("_")),
 		[]byte("_"),
 	)), "_")
+}
+
+// Converts a result to an Elasticsearch document.
+func resultToElasticsearchDocument(
+	query string,
+	labels []string,
+	result Result,
+) (document []byte, err error) {
+	var (
+		payload = make(map[string]interface{}, len(labels)+2) // Payload to construct the document from.
+	)
+
+	// Add fields for each value.
+	for k, v := range result.Map(labels) {
+		payload[fmt.Sprintf("cryptarch.value.%s", k)] = v
+	}
+
+	// Add additional fields to the payload.
+	payload["timestamp"] = result.Time
+	payload["cryptarch.query"] = query
+
+	// Build the document body.
+	document, err = json.Marshal(payload)
+
+	return
 }
 
 // Converts a result to a Prometheus metric.
@@ -174,24 +302,8 @@ func resultToPromMetric(
 	return
 }
 
-// Create a new storage for Prometheus.
-func NewPrometheusStorage(address string) PrometheusStorage {
-	var registry = prometheus.NewRegistry()
-
-	// Start the metrics endpoint for results.
-	http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}))
-	go http.ListenAndServe(address, nil)
-
-	return PrometheusStorage{
-		registry: registry,
-	}
-}
-
-// Create a new storage for Pushgateway.
-func NewPushgatewayStorage(address string) PushgatewayStorage {
-
-	return PushgatewayStorage{
-		address:  address,
-		registry: prometheus.NewRegistry(),
-	}
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Public Functions
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////

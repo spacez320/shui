@@ -16,13 +16,14 @@ var (
 
 // Shareable configuration. See CLI flags for further details.
 type Config struct {
-	Count, Delay, DisplayMode, Mode       int
-	Expressions, Filters, Labels, Queries []string
-	History, LogMulti, Silent             bool
-	LogLevel                              string
-	Port                                  string
-	PrometheusExporterAddr                string
-	PushgatewayAddr                       string
+	Count, Delay, DisplayMode, Mode                                                 int
+	ElasticsearchAddr, ElasticsearchIndex, ElasticsearchPassword, ElasticsearchUser string
+	Expressions, Filters, Labels, Queries                                           []string
+	History, LogMulti, Silent                                                       bool
+	LogLevel                                                                        string
+	Port                                                                            string
+	PrometheusExporterAddr                                                          string
+	PushgatewayAddr                                                                 string
 }
 
 // Retrieves an Slog level from a human-readable level string.
