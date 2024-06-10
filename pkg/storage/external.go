@@ -239,7 +239,7 @@ func queryToPromMetricName(query string) string {
 	)), "_")
 }
 
-// Converts a result to a Prometheus metric.
+// Converts a result to an Elasticsearch document.
 func resultToElasticsearchDocument(
 	query string,
 	labels []string,
