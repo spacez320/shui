@@ -219,7 +219,7 @@ Planned improvements include things like:
 - [x] Ability to perform calculations on streams of data, such as aggregates, rates, or quantile math.
 - [ ] Better text result management, such as diff'ing.
 - [x] Export data to external systems, such as Prometheus.
-- [ ] ... and Elasticsearch.
+- [x] ... and Elasticsearch.
 - [ ] More detailed and varied display modes.
 - [ ] Historical querying.
 - [ ] Beter management of textual data, including diffs.
