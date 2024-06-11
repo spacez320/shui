@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestQueryToPromName(t *testing.T) {
+func TestNormalizeString(t *testing.T) {
 	tests := map[string]string{
 		"test":          "test",
 		"foo__bar":      "foo_bar",
@@ -13,7 +13,7 @@ func TestQueryToPromName(t *testing.T) {
 
 	// It gets a result matching the time.
 	for input, expected := range tests {
-		if got := queryToPromMetricName(input); got != expected {
+		if got := normalizeString(input); got != expected {
 			t.Errorf("Got: %v Expected: %v\n", got, expected)
 		}
 	}
