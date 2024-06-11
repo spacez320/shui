@@ -213,7 +213,7 @@ func getPromInstance() (localIP string, err error) {
 	// Make a dummy request to get the default outbound IP. Kind of hacky.
 	conn, err := net.Dial("udp", DUMMY_OUTBOUND_ADDR)
 	if err != nil {
-		// We couldn't make anoutbound connection--try to just list interfaces and grab the first one.
+		// We couldn't make an outbound connection--try to just list interfaces and grab the first one.
 		localAddrs, err = net.InterfaceAddrs()
 		if err != nil {
 			return "", err
