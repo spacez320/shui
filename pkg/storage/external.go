@@ -30,12 +30,14 @@ const (
 )
 
 var (
-	// Regular expression used for constructing Prometheus metric names. Represents the negation of
-	// characters allowed in order to sanitize bad characters. We also replace the valid character ':'
-	// as they are for recording rules.
+	// Regular expression used for constructing strings (names, labels, etc.) safely useable by
+	// external sources. Represents the negation of characters allowed in order to sanitize unwanted
+	// characters.
+	//
+	// For Prometheus, we also replace the valid character ':' as they are for recording rules.
 	//
 	// See: https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
-	prometheus_metric_name_replace_regexp = regexp.MustCompile("[^a-zA-Z0-9_]+")
+	normalize_regexp = regexp.MustCompile("[^a-zA-Z0-9_]+")
 )
 
 // Interface for any external storage system.
@@ -65,13 +67,13 @@ func (e *ElasticsearchStorage) Put(query string, labels []string, result Result)
 		// Configuration for the Elasticsearch client.
 		esConfig = elasticsearch.Config{
 			Addresses: []string{e.address},
-			Username:  e.user,
 			Password:  e.password,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: true,
 				},
 			},
+			Username: e.user,
 		}
 	)
 
@@ -122,7 +124,7 @@ func (p *PushgatewayStorage) Put(query string, labels []string, result Result) e
 		instance string               // Prometheus instance value.
 		metric   *prometheus.GaugeVec // Produced metric to push.
 
-		name = queryToPromMetricName(query) // Name for the metric.
+		name = normalizeString(query) // Name for the metric.
 	)
 
 	// Get the instance value.
@@ -168,7 +170,7 @@ func (p *PrometheusStorage) Put(query string, labels []string, result Result) er
 		err    error                // General error holder.
 		metric *prometheus.GaugeVec // Produced metric to push.
 
-		name = queryToPromMetricName(query) // Name for the metric.
+		name = normalizeString(query) // Name for the metric.
 	)
 
 	// Build the metric.
@@ -211,7 +213,7 @@ func getPromInstance() (localIP string, err error) {
 	// Make a dummy request to get the default outbound IP. Kind of hacky.
 	conn, err := net.Dial("udp", DUMMY_OUTBOUND_ADDR)
 	if err != nil {
-		// We couldn't make anoutbound connection--try to just list interfaces and grab the first one.
+		// We couldn't make an outbound connection--try to just list interfaces and grab the first one.
 		localAddrs, err = net.InterfaceAddrs()
 		if err != nil {
 			return "", err
@@ -226,15 +228,15 @@ func getPromInstance() (localIP string, err error) {
 	return localIP, err
 }
 
-// Converts a query string to something acceptable as a Prometheus metric name.
-func queryToPromMetricName(query string) string {
+// Converts a string to something acceptable as a name or label useable by external sources.
+func normalizeString(s string) string {
 	// The operations are:
 	//
-	// 1. Replace all non-metric characters with an underscore.
+	// 1. Replace all non-alphanumeric characters with an underscore.
 	// 2. Replace multiple, adjacent underscores with a single underscore.
 	// 3. Trim extra underscore prefixes and suffixes.
 	return strings.Trim(string(regexp.MustCompile("_+").ReplaceAll(
-		prometheus_metric_name_replace_regexp.ReplaceAll([]byte(query), []byte("_")),
+		normalize_regexp.ReplaceAll([]byte(s), []byte("_")),
 		[]byte("_"),
 	)), "_")
 }
@@ -245,13 +247,12 @@ func resultToElasticsearchDocument(
 	labels []string,
 	result Result,
 ) (document []byte, err error) {
-	var (
-		payload = make(map[string]interface{}, len(labels)+2) // Payload to construct the document from.
-	)
+	// Payload to construct the document from, accounting for the two additional fields added.
+	var payload = make(map[string]interface{}, len(labels)+2)
 
 	// Add fields for each value.
 	for k, v := range result.Map(labels) {
-		payload[fmt.Sprintf("cryptarch.value.%s", k)] = v
+		payload[fmt.Sprintf("cryptarch.value.%s", normalizeString(k))] = v
 	}
 
 	// Add additional fields to the payload.

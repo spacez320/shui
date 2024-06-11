@@ -10,11 +10,20 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/spacez320/cryptarch"
 	"github.com/spacez320/cryptarch/internal/lib"
 )
+
+// Used to supply build information.
+type buildInfo struct {
+	buildDate string
+	gitCommit string
+	goVersion string
+	version   string
+}
 
 // Queries provided as flags.
 type multiArg []string
@@ -69,7 +78,13 @@ var (
 	showHelp              bool     // Whether or not to show helpt
 	showLogs              bool     // Whether or not to show logs.
 	showStatus            bool     // Whether or not to show statuses.
+	showVersion           bool     // Whether or not to display a version.
 	silent                bool     // Whether or not to be quiet.
+
+	// Supplied by the linker at build time.
+	version string
+	commit  string
+	date    string
 
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
@@ -96,6 +111,7 @@ func main() {
 	flag.BoolVar(&showHelp, "show-help", true, "Whether or not to show help displays.")
 	flag.BoolVar(&showLogs, "show-logs", false, "Whether or not to show log displays.")
 	flag.BoolVar(&showStatus, "show-status", true, "Whether or not to show status displays.")
+	flag.BoolVar(&showVersion, "version", false, "Show version.")
 	flag.BoolVar(&silent, "silent", false, "Don't output anything to a console.")
 	flag.IntVar(&count, "count", 1, "Number of query executions. -1 for continuous.")
 	flag.IntVar(&delay, "delay", 3, "Delay between queries (seconds).")
@@ -128,6 +144,17 @@ func main() {
 		"mode, this is expected to be some command. When in profile mode it is expected to be PID. "+
 		"At least one query must be provided.")
 	flag.Parse()
+
+	// Display a version.
+	if showVersion {
+		fmt.Printf("cryptarch %#v\n", buildInfo{
+			buildDate: date,
+			gitCommit: commit,
+			goVersion: runtime.Version(),
+			version:   version,
+		})
+		os.Exit(0)
+	}
 
 	// Check for required flags.
 	if len(queries) == 0 {
