@@ -86,7 +86,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 
 	// Execute result viewing.
 	if !config.Silent {
-		lib.Results(
+		go lib.Results(
 			ctx,
 			lib.DisplayMode(config.DisplayMode),
 			ctx.Value("queries").([]string)[0], // Always start with the first query.
@@ -102,5 +102,6 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 	// (`lib.Results` does not have any intentional return condition), but it's being left here in
 	// case in the future we do want to control for query completion.
 	<-doneQueriesChan
+	slog.Debug("Received the last result, nothing left to do")
 	close(doneQueriesChan)
 }
