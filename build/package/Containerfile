@@ -1,5 +1,5 @@
 FROM scratch
-WORKDIR /cryptarch
-COPY dist/cryptarch_linux_amd64_v1/cryptarch .
-ENTRYPOINT ["/cryptarch/cryptarch"]
+WORKDIR /shui
+COPY dist/shui_linux_amd64_v1/shui .
+ENTRYPOINT ["/shui/shui"]
 CMD ["-h"]

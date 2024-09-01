@@ -30,7 +30,7 @@ const (
 	MAX_EXTERNAL_STORAGES  = 128            // Maximum external storage integrations.
 	MAX_RESULTS            = 128            // Maximum number of result series that may be maintained.
 	PUT_EVENT_CHANNEL_SIZE = 128            // Size of put channels, controlling the amount of waiting results.
-	STORAGE_FILE_DIR       = "cryptarch"    // Directory in user cache to use for storage.
+	STORAGE_FILE_DIR       = "shui"         // Directory in user cache to use for storage.
 	STORAGE_FILE_NAME      = "storage.json" // Filename to use for actual storage.
 )
 
@@ -301,12 +301,12 @@ func (s *Storage) Show(query string) {
 // Initializes a new storage, loading in any saved storage data.
 func NewStorage(persistence bool) (storage Storage, err error) {
 	var (
-		cryptarchUserCacheDir string              // Cryptarch specific user cache data.
-		results               map[string]*Results // Pre-built storage with existing data.
-		storageData           []byte              // Raw read storage data.
-		storageFilepath       string              // Filepath for storage.
-		storageStat           fs.FileInfo         // Stat for the storage file.
-		userCacheDir          string              // User cache directory, contextual to OS.
+		shuiUserCacheDir string              // Shui specific user cache data.
+		results          map[string]*Results // Pre-built storage with existing data.
+		storageData      []byte              // Raw read storage data.
+		storageFilepath  string              // Filepath for storage.
+		storageStat      fs.FileInfo         // Stat for the storage file.
+		userCacheDir     string              // User cache directory, contextual to OS.
 	)
 
 	// Initialize storage.
@@ -328,14 +328,14 @@ func NewStorage(persistence bool) (storage Storage, err error) {
 	}
 
 	// Create the user cache directory for data.
-	cryptarchUserCacheDir = filepath.Join(userCacheDir, STORAGE_FILE_DIR)
-	err = os.MkdirAll(cryptarchUserCacheDir, fs.FileMode(0770))
+	shuiUserCacheDir = filepath.Join(userCacheDir, STORAGE_FILE_DIR)
+	err = os.MkdirAll(shuiUserCacheDir, fs.FileMode(0770))
 	if err != nil {
 		return
 	}
 
 	// Instantiate the storage file.
-	storageFilepath = filepath.Join(cryptarchUserCacheDir, STORAGE_FILE_NAME)
+	storageFilepath = filepath.Join(shuiUserCacheDir, STORAGE_FILE_NAME)
 	storage.storageFile, err = os.OpenFile(
 		storageFilepath,
 		os.O_CREATE|os.O_RDWR,

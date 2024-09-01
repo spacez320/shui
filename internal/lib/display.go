@@ -13,7 +13,7 @@ import (
 	"github.com/mum4k/termdash/widgets/sparkline"
 	"github.com/rivo/tview"
 
-	"github.com/spacez320/cryptarch/pkg/storage"
+	"github.com/spacez320/shui/pkg/storage"
 )
 
 // General configuration for display modes.

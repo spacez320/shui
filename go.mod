@@ -1,4 +1,4 @@
-module github.com/spacez320/cryptarch
+module github.com/spacez320/shui
 
 go 1.21
 

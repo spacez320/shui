@@ -1,5 +1,5 @@
 //
-// TODO This is a placeholder package for future Cryptarch-defined expressions not provided by the
+// TODO This is a placeholder package for future Shui-defined expressions not provided by the
 // expression language. Functions here in its current state are just examples and for testing.
 
 package dsl

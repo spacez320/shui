@@ -21,12 +21,12 @@ import (
 )
 
 const (
-	DUMMY_OUTBOUND_ADDR         = "8.8.8.8:80"             // Some outbound address for dummy requests.
-	PROMETHEUS_JOB              = "cryptarch"              // What to apply for the Prometheus job.
-	PROMETHEUS_METRICS_ENDPOINT = "/results"               // Endpoint where Prometheus metrics are presented.
-	PROMETHEUS_METRICS_HELP     = "Produced by Cryptarch." // Help text for all Prometheus metrics.
-	PROMETHEUS_METRIC_LABEL     = "cryptarch_label"        // What Prometheus label to use for the Cryptarch label.
-	PROMETHEUS_METRIC_PREFIX    = "cryptarch"              // Prefix for all Prometheus metrics.
+	DUMMY_OUTBOUND_ADDR         = "8.8.8.8:80"        // Some outbound address for dummy requests.
+	PROMETHEUS_JOB              = "shui"              // What to apply for the Prometheus job.
+	PROMETHEUS_METRICS_ENDPOINT = "/results"          // Endpoint where Prometheus metrics are presented.
+	PROMETHEUS_METRICS_HELP     = "Produced by Shui." // Help text for all Prometheus metrics.
+	PROMETHEUS_METRIC_LABEL     = "shui_label"        // What Prometheus label to use for the Shui label.
+	PROMETHEUS_METRIC_PREFIX    = "shui"              // Prefix for all Prometheus metrics.
 )
 
 var (
@@ -252,12 +252,12 @@ func resultToElasticsearchDocument(
 
 	// Add fields for each value.
 	for k, v := range result.Map(labels) {
-		payload[fmt.Sprintf("cryptarch.value.%s", normalizeString(k))] = v
+		payload[fmt.Sprintf("shui.value.%s", normalizeString(k))] = v
 	}
 
 	// Add additional fields to the payload.
 	payload["timestamp"] = result.Time
-	payload["cryptarch.query"] = query
+	payload["shui.query"] = query
 
 	// Build the document body.
 	document, err = json.Marshal(payload)
