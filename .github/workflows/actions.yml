@@ -1,4 +1,4 @@
-name: cryptarch
+name: shui
 
 on:
   - push
@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Tests
         run: |
-          pushd cmd/cryptarch
+          pushd cmd/shui
           go mod tidy  # FIXME I don't know why this is necessary.
           go test
           popd
@@ -42,7 +42,7 @@ jobs:
       - run: |
           podman build \
             --file build/package/Containerfile \
-            --tag spacez320/cryptarch:${{ github.sha }} \
+            --tag spacez320/shui:${{ github.sha }} \
             .
 
   release:
@@ -72,13 +72,13 @@ jobs:
 
           podman build \
             --file build/package/Containerfile \
-            --tag spacez320/cryptarch:${{ github.sha }} \
+            --tag spacez320/shui:${{ github.sha }} \
             .
 
           podman tag \
-            spacez320/cryptarch:${{ github.sha }} \
-            spacez320/cryptarch:${{ github.ref_name }} \
-            spacez320/cryptarch:latest
+            spacez320/shui:${{ github.sha }} \
+            spacez320/shui:${{ github.ref_name }} \
+            spacez320/shui:latest
 
-          podman push spacez320/cryptarch:${{ github.ref_name }}
-          podman push spacez320/cryptarch:latest
+          podman push spacez320/shui:${{ github.ref_name }}
+          podman push spacez320/shui:latest

@@ -10,7 +10,7 @@ before:
     # - go generate ./...  # Leaving for future use.
 
 builds:
-  - dir: cmd/cryptarch
+  - dir: cmd/shui
     env:
       - CGO_ENABLED=0
     goos:
