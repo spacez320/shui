@@ -19,7 +19,7 @@ type Config struct {
 	Count, Delay, DisplayMode, Mode                                                 int
 	ElasticsearchAddr, ElasticsearchIndex, ElasticsearchPassword, ElasticsearchUser string
 	Expressions, Filters, Labels, Queries                                           []string
-	History, LogMulti, Silent                                                       bool
+	History, LogMulti, ReadStdin, Silent                                            bool
 	LogLevel                                                                        string
 	Port                                                                            string
 	PrometheusExporterAddr                                                          string

@@ -22,6 +22,10 @@ const (
 	MODE_READ                         // For running in 'read' mode.
 )
 
+const (
+	STDIN_QUERY_NAME = "stdin" // Named query value for reading stdin.
+)
+
 var (
 	ctx = context.Background() // Initialize context.
 )
@@ -37,8 +41,28 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 	slog.Debug("Running with config", "config", config)
 	slog.Debug("Running with display config", "displayConfig", displayConfig)
 
+	// Define special query value when reading standard input.
+	if config.ReadStdin {
+		config.Queries = []string{STDIN_QUERY_NAME}
+	}
+
 	// Execute the specified mode.
 	switch {
+	case config.ReadStdin:
+		slog.Debug("Reading from standard input")
+
+		doneQueriesChan, pauseQueryChans = lib.Query(
+			lib.QUERY_MODE_STDIN,
+			-1,
+			config.Delay,
+			config.Queries,
+			config.Port,
+			config.History,
+			resultsReadyChan,
+		)
+
+		// Use labels that match the defined value for queries.
+		ctx = context.WithValue(ctx, "labels", config.Queries)
 	case config.Mode == int(MODE_PROFILE):
 		slog.Debug("Executing in profile mode")
 
