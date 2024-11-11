@@ -80,7 +80,6 @@ var (
 	showStatus            bool     // Whether or not to show statuses.
 	showVersion           bool     // Whether or not to display a version.
 	silent                bool     // Whether or not to be quiet.
-	readStdin             bool     // Whether input comes from standard input.
 
 	// Supplied by the linker at build time.
 	version string
@@ -157,21 +156,11 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Detect if running from standard input.
-	f, err := os.Stdin.Stat()
-	if err != nil {
-		panic(err)
-	}
-	if f.Mode()&os.ModeNamedPipe != 0 {
-		// We are reading standard input.
-		readStdin = true
-	} else {
-		// There is no standard input--queries are needed.
-		if len(queries) == 0 {
-			flag.Usage()
-			fmt.Fprintf(os.Stderr, "Missing required argument -query\n")
-			os.Exit(1)
-		}
+	// Check for required flags.
+	if len(queries) == 0 {
+		flag.Usage()
+		fmt.Fprintf(os.Stderr, "Missing required argument -query\n")
+		os.Exit(1)
 	}
 
 	// Set-up logging.
@@ -218,7 +207,6 @@ func main() {
 		PrometheusExporterAddr: promExporterAddr,
 		PushgatewayAddr:        promPushgatewayAddr,
 		Queries:                queries,
-		ReadStdin:              readStdin,
 	}
 
 	// Build display configuration.
