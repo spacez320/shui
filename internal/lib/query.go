@@ -4,8 +4,10 @@
 package lib
 
 import (
+	"bufio"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strconv"
 	"time"
@@ -14,6 +16,11 @@ import (
 const (
 	QUERY_MODE_COMMAND int = iota + 1 // Queries are commands.
 	QUERY_MODE_PROFILE                // Queries are PIDs to profile.
+	QUERY_MODE_STDIN                  // Results are fron stdin.
+)
+
+var (
+	stdinScanner = bufio.NewScanner(os.Stdin) // Scanner for standard input queries.
 )
 
 // Wrapper for query execution.
@@ -22,7 +29,7 @@ func runQuery(
 	attempts, delay int,
 	history bool,
 	doneChan, pauseChan chan bool,
-	queryFunc func(string, bool),
+	queryFunc func(string, bool) bool,
 ) {
 	// This loop executes as long as attempts has not been reached, or indefinitely if attempts is
 	// less than zero.
@@ -33,7 +40,11 @@ func runQuery(
 			// pause channel.
 			<-pauseChan
 		default:
-			queryFunc(query, history)
+			if !queryFunc(query, history) {
+				// In the event that queryFunc returns false, allow this to signal query completion, even if
+				// attempts are not satisifed.
+				attempts = 0
+			}
 
 			// This is not the last execution--add a delay.
 			if i != attempts {
@@ -42,11 +53,12 @@ func runQuery(
 		}
 	}
 
+	slog.Debug("Query done", "query", query)
 	doneChan <- true
 }
 
 // Executes a query as a command to exec.
-func runQueryExec(query string, history bool) {
+func runQueryExec(query string, history bool) bool {
 	slog.Debug("Executing query", "query", query)
 
 	// Prepare query execution.
@@ -79,15 +91,34 @@ func runQueryExec(query string, history bool) {
 
 	// Clean-up.
 	cmd.Wait()
+
+	return true
 }
 
 // Executes a query as a process to profile.
-func runQueryProfile(pid string, history bool) {
+func runQueryProfile(pid string, history bool) bool {
 	slog.Debug("Profiling pid", "pid", pid)
 
 	pidInt, err := strconv.Atoi(pid)
 	e(err)
 	AddResult(pid, runProfile(pidInt), history)
+
+	return true
+}
+
+// Reads standard input for results.
+func runQueryStdin(query string, history bool) bool {
+	var success = true
+
+	slog.Debug("Reading stdin")
+
+	if stdinScanner.Scan() {
+		AddResult(query, stdinScanner.Text(), history)
+	} else {
+		success = false
+	}
+
+	return success
 }
 
 // Entrypoint for 'query' mode.
@@ -107,21 +138,20 @@ func Query(
 	// Start the RPC server.
 	initServer(port)
 
-	for _, query := range queries {
-		// Initialize pause channels.
-		pauseQueryChans[query] = make(chan bool)
-	}
-
 	go func() {
 		// Wait for result consumption to become ready.
 		slog.Debug("Waiting for results readiness")
 		<-resultsReadyChan
 
-		for _, query := range queries {
-			// Execute the queries.
-			switch queryMode {
-			case QUERY_MODE_COMMAND:
-				slog.Debug("Executing in query mode command")
+		// Execute the queries.
+		switch queryMode {
+		case QUERY_MODE_COMMAND:
+			slog.Debug("Executing in query mode command")
+
+			for _, query := range queries {
+				// Initialize pause channels.
+				pauseQueryChans[query] = make(chan bool)
+
 				go runQuery(
 					query,
 					attempts,
@@ -131,8 +161,14 @@ func Query(
 					pauseQueryChans[query],
 					runQueryExec,
 				)
-			case QUERY_MODE_PROFILE:
-				slog.Debug("Executing in query mode profile")
+			}
+		case QUERY_MODE_PROFILE:
+			slog.Debug("Executing in query mode profile")
+
+			for _, query := range queries {
+				// Initialize pause channels.
+				pauseQueryChans[query] = make(chan bool)
+
 				go runQuery(
 					query,
 					attempts,
@@ -143,6 +179,22 @@ func Query(
 					runQueryProfile,
 				)
 			}
+		case QUERY_MODE_STDIN:
+			// When executing by reading standard input, there is only ever one "query".
+			slog.Debug("Executing in query mode stdin")
+
+			// Initialize pause channels.
+			pauseQueryChans[queries[0]] = make(chan bool)
+
+			go runQuery(
+				queries[0],
+				attempts,
+				delay,
+				history,
+				doneQueryChan,
+				pauseQueryChans[queries[0]],
+				runQueryStdin,
+			)
 		}
 	}()
 

@@ -22,6 +22,10 @@ const (
 	MODE_READ                         // For running in 'read' mode.
 )
 
+const (
+	STDIN_QUERY_NAME = "stdin" // Named query value for reading stdin.
+)
+
 var (
 	ctx = context.Background() // Initialize context.
 )
@@ -37,8 +41,28 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 	slog.Debug("Running with config", "config", config)
 	slog.Debug("Running with display config", "displayConfig", displayConfig)
 
+	// Define a special query value when reading standard input.
+	if config.ReadStdin {
+		config.Queries = []string{STDIN_QUERY_NAME}
+	}
+
 	// Execute the specified mode.
 	switch {
+	case config.ReadStdin:
+		slog.Debug("Reading from standard input")
+
+		doneQueriesChan, pauseQueryChans = lib.Query(
+			lib.QUERY_MODE_STDIN,
+			-1, // Stdin mode is always continuous and the query itself must detect EOF.
+			config.Delay,
+			config.Queries,
+			config.Port,
+			config.History,
+			resultsReadyChan,
+		)
+
+		// Use labels that match the defined value for queries.
+		ctx = context.WithValue(ctx, "labels", config.Labels)
 	case config.Mode == int(MODE_PROFILE):
 		slog.Debug("Executing in profile mode")
 
@@ -98,9 +122,6 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 		)
 	}
 
-	// XXX This isn't strictly necessary, mainly because getting here shouldn't be possible
-	// (`lib.Results` does not have any intentional return condition), but it's being left here in
-	// case in the future we do want to control for query completion.
 	<-doneQueriesChan
 	slog.Debug("Received the last result, nothing left to do")
 	close(doneQueriesChan)
