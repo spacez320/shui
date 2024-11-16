@@ -227,7 +227,6 @@ Planned improvements include things like:
 - [x] ... and Elasticsearch.
 - [ ] More detailed and varied display modes.
 - [ ] Historical querying.
-- [ ] Beter management of textual data, including diffs.
 
 Similar Projects
 ----------------

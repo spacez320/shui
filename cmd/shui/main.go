@@ -75,12 +75,12 @@ var (
 	promExporterAddr      string   // Address for Prometheus metrics page.
 	promPushgatewayAddr   string   // Address for Prometheus Pushgateway.
 	queries               multiArg // Queries to execute.
+	readStdin             bool     // Whether input comes from standard input.
 	showHelp              bool     // Whether or not to show helpt
 	showLogs              bool     // Whether or not to show logs.
 	showStatus            bool     // Whether or not to show statuses.
 	showVersion           bool     // Whether or not to display a version.
 	silent                bool     // Whether or not to be quiet.
-	readStdin             bool     // Whether input comes from standard input.
 
 	// Supplied by the linker at build time.
 	version string

@@ -41,7 +41,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 	slog.Debug("Running with config", "config", config)
 	slog.Debug("Running with display config", "displayConfig", displayConfig)
 
-	// Define special query value when reading standard input.
+	// Define a special query value when reading standard input.
 	if config.ReadStdin {
 		config.Queries = []string{STDIN_QUERY_NAME}
 	}
@@ -53,7 +53,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 
 		doneQueriesChan, pauseQueryChans = lib.Query(
 			lib.QUERY_MODE_STDIN,
-			-1,
+			-1, // Stdin mode is always continuous and the query itself must detect EOF.
 			config.Delay,
 			config.Queries,
 			config.Port,
@@ -122,9 +122,6 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 		)
 	}
 
-	// XXX This isn't strictly necessary, mainly because getting here shouldn't be possible
-	// (`lib.Results` does not have any intentional return condition), but it's being left here in
-	// case in the future we do want to control for query completion.
 	<-doneQueriesChan
 	slog.Debug("Received the last result, nothing left to do")
 	close(doneQueriesChan)
