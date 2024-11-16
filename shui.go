@@ -62,7 +62,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 		)
 
 		// Use labels that match the defined value for queries.
-		ctx = context.WithValue(ctx, "labels", config.Queries)
+		ctx = context.WithValue(ctx, "labels", config.Labels)
 	case config.Mode == int(MODE_PROFILE):
 		slog.Debug("Executing in profile mode")
 

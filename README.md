@@ -80,8 +80,8 @@ shui -query 'whoami'
 # Execute `uptime` continuously, printing results to the console, without using persistence.
 shui \
     -count -1 \
-    -query 'uptime' \
-    -store=none
+    -history=false \
+    -query 'uptime'
 
 # Get the size of an NVME disk's used space and output it to a table with the specific label "NVME
 # Used Space".
@@ -90,6 +90,12 @@ shui \
     -display 3 \
     -labels "NVME Used Space" \
     -query 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\'''
+```
+
+You can also execute Shui from standard input, which works like query mode.
+
+```sh
+while true; do uptime; sleep 1; done | shui
 ```
 
 ### Integrations
@@ -199,8 +205,7 @@ shui -query 'uptime | tr -d ","' -expr 'get(result, "9") * 10'
 
 # Cumulatively sum 5m CPU average. Note that we need to account for prevResult being empty and we
 # must convert the prevResult from a string to a float.
-shui -query 'uptime | tr -d ","' -filters 9 -expr 'get(result, "0") + ("0" in prevResult?
-float(get(prevResult, "0")) : 0)'
+shui -query 'uptime | tr -d ","' -filters 9 -expr 'get(result, "0") + ("0" in prevResult? float(get(prevResult, "0")) : 0)'
 ```
 
 See: <https://expr-lang.org/docs/language-definition>

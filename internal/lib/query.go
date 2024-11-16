@@ -29,7 +29,7 @@ func runQuery(
 	attempts, delay int,
 	history bool,
 	doneChan, pauseChan chan bool,
-	queryFunc func(string, bool),
+	queryFunc func(string, bool) bool,
 ) {
 	// This loop executes as long as attempts has not been reached, or indefinitely if attempts is
 	// less than zero.
@@ -40,7 +40,11 @@ func runQuery(
 			// pause channel.
 			<-pauseChan
 		default:
-			queryFunc(query, history)
+			if !queryFunc(query, history) {
+				// In the event that queryFunc returns false, allow this to signal query completion, even if
+				// attempts are not satisifed.
+				attempts = 0
+			}
 
 			// This is not the last execution--add a delay.
 			if i != attempts {
@@ -49,11 +53,12 @@ func runQuery(
 		}
 	}
 
+	slog.Debug("Query done", "query", query)
 	doneChan <- true
 }
 
 // Executes a query as a command to exec.
-func runQueryExec(query string, history bool) {
+func runQueryExec(query string, history bool) bool {
 	slog.Debug("Executing query", "query", query)
 
 	// Prepare query execution.
@@ -86,26 +91,34 @@ func runQueryExec(query string, history bool) {
 
 	// Clean-up.
 	cmd.Wait()
+
+	return true
 }
 
 // Executes a query as a process to profile.
-func runQueryProfile(pid string, history bool) {
+func runQueryProfile(pid string, history bool) bool {
 	slog.Debug("Profiling pid", "pid", pid)
 
 	pidInt, err := strconv.Atoi(pid)
 	e(err)
 	AddResult(pid, runProfile(pidInt), history)
+
+	return true
 }
 
 // Reads standard input for results.
-func runQueryStdin(query string, history bool) {
+func runQueryStdin(query string, history bool) bool {
+	var success = true
+
 	slog.Debug("Reading stdin")
 
-	stdinScanner.Scan()
-	err := stdinScanner.Err()
-	e(err)
+	if stdinScanner.Scan() {
+		AddResult(query, stdinScanner.Text(), history)
+	} else {
+		success = false
+	}
 
-	AddResult(query, stdinScanner.Text(), history)
+	return success
 }
 
 // Entrypoint for 'query' mode.
