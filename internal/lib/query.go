@@ -5,6 +5,7 @@ package lib
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -125,7 +126,7 @@ func runQueryStdin(query string, history bool) bool {
 func Query(
 	queryMode, attempts, delay int,
 	queries []string,
-	port string,
+	port int,
 	history bool,
 	resultsReadyChan chan bool,
 ) (chan bool, map[string]chan bool) {
@@ -136,7 +137,7 @@ func Query(
 	)
 
 	// Start the RPC server.
-	initServer(port)
+	initServer(fmt.Sprintf("%d", port))
 
 	go func() {
 		// Wait for result consumption to become ready.

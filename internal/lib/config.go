@@ -16,12 +16,11 @@ var (
 
 // Shareable configuration. See CLI flags for further details.
 type Config struct {
-	Count, Delay, DisplayMode, Mode                                                 int
+	Count, Delay, DisplayMode, Mode, Port                                           int
 	ElasticsearchAddr, ElasticsearchIndex, ElasticsearchPassword, ElasticsearchUser string
 	Expressions, Filters, Labels, Queries                                           []string
 	History, LogMulti, ReadStdin, Silent                                            bool
 	LogLevel                                                                        string
-	Port                                                                            string
 	PrometheusExporterAddr                                                          string
 	PushgatewayAddr                                                                 string
 }
