@@ -38,6 +38,7 @@ func Run(config lib.Config, displayConfig lib.DisplayConfig) {
 
 		resultsReadyChan = make(chan bool) // Channel for signaling results readiness.
 	)
+
 	slog.Debug("Running with config", "config", config)
 	slog.Debug("Running with display config", "displayConfig", displayConfig)
 

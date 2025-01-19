@@ -9,6 +9,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/spacez320/shui"
@@ -28,7 +29,7 @@ type buildInfo struct {
 // Misc. constants.
 const (
 	CONFIG_FILE_DIR  = "shui"      // Directory for Shui configuration.
-	CONFIG_FILE_NAME = "shui.yaml" // Shui configuration file.
+	CONFIG_FILE_NAME = "shui.toml" // Shui configuration file.
 )
 
 var (
@@ -50,6 +51,17 @@ var (
 )
 
 func main() {
+	var (
+		err           error  // General error holder.
+		userConfigDir string // User configuration directory.
+	)
+
+	// Retrieve the user config directory.
+	userConfigDir, err = os.UserConfigDir()
+	if err != nil {
+		panic(err)
+	}
+
 	// Define configuration defaults.
 	viper.SetDefault("count", 1)
 	viper.SetDefault("delay", 3)
@@ -78,6 +90,19 @@ func main() {
 	viper.SetDefault("show-status", true)
 	viper.SetDefault("silent", false)
 	viper.SetDefault("version", false)
+
+	viper.SetConfigFile(filepath.Join(userConfigDir, CONFIG_FILE_DIR, CONFIG_FILE_NAME))
+	err = viper.ReadInConfig()
+	if err != nil {
+		// Exclude errors that indicate a missing configuration file.
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			// FIXME There is currently a bug preventing Viper from ever returning
+			// `ConfigFileNotFoundError`. For now, skip over any configuration file errors.
+			//
+			// See: https://github.com/spf13/viper/issues/1783
+			// panic(err)
+		}
+	}
 
 	// Define arguments.
 	flag.Bool("history", viper.GetBool("history"), "Whether or not to use or preserve history.")
