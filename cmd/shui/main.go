@@ -42,6 +42,24 @@ var (
 	commit  string
 	date    string
 
+	// Aliases to apply for configuration settings, mainly to account for differences between flags
+	// (the left column) and configuration files (the right column).
+	configurationAliases = map[string]string{
+		"elasticsearch-addr":     "elasticsearch.addr",
+		"elasticsearch-index":    "elasticsearch.index",
+		"elasticsearch-password": "elasticsearch.password",
+		"elasticsearch-user":     "elasticsearch.user",
+		"outer-padding-bottom":   "tui.padding.bottom",
+		"outer-padding-left":     "tui.padding.left",
+		"outer-padding-right":    "tui.padding.right",
+		"outer-padding-top":      "tui.padding.top",
+		"prometheus-exporter":    "prometheus.exporter",
+		"prometheus-pushgateway": "prometheus.pushgateway",
+		"show-help":              "tui.show.help",
+		"show-logs":              "tui.show.logs",
+		"show-status":            "tui.show.status",
+	}
+
 	logger                 = log.Default() // Logging system.
 	logLevelStrToSlogLevel = map[string]slog.Level{
 		"debug": slog.LevelDebug,
@@ -92,19 +110,6 @@ func main() {
 	viper.SetDefault("silent", false)
 	viper.SetDefault("version", false)
 
-	viper.SetConfigFile(filepath.Join(userConfigDir, CONFIG_FILE_DIR, CONFIG_FILE_NAME))
-	err = viper.ReadInConfig()
-	if err != nil {
-		// Exclude errors that indicate a missing configuration file.
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			// FIXME There is currently a bug preventing Viper from ever returning
-			// `ConfigFileNotFoundError`. For now, skip over any configuration file errors.
-			//
-			// See: https://github.com/spf13/viper/issues/1783
-			// panic(err)
-		}
-	}
-
 	// Define arguments.
 	flag.Bool("help", false, "Show usage")
 	flag.Bool("history", viper.GetBool("history"), "Whether or not to use or preserve history.")
@@ -146,7 +151,37 @@ func main() {
 	flag.StringSlice("labels", viper.GetStringSlice("labels"),
 		"Labels to apply to query values, separated by commas.")
 	flag.Parse()
+
+	// Define configuration sources.
+	viper.SetConfigFile(filepath.Join(userConfigDir, CONFIG_FILE_DIR, CONFIG_FILE_NAME))
+	err = viper.ReadInConfig()
+	if err != nil {
+		// Exclude errors that indicate a missing configuration file.
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			// FIXME There is currently a bug preventing Viper from ever returning
+			// `ConfigFileNotFoundError`. For now, skip over any configuration file errors.
+			//
+			// See: https://github.com/spf13/viper/issues/1783
+			// panic(err)
+			slog.Warn(err.Error())
+		}
+	}
 	viper.BindPFlags(flag.CommandLine)
+
+	// Manage configuration aliases.
+	for k, v := range configurationAliases {
+		// FIXME There is currently a bug preventing Viper from doing overrides correctly with aliases.
+		// Therefore, we circumvent the alias behavior by comparing the existence of flags to
+		// configuration file entries, letting the former override the latter and setting them to the
+		// same thing, making the alias registration a little pointless, but safe.
+		//
+		// See: https://github.com/spf13/viper/issues/689
+		if viper.Get(k) != nil {
+			// Equalize the flag and config values.
+			viper.Set(v, k)
+		}
+		viper.RegisterAlias(v, k)
+	}
 
 	// Display usage.
 	if viper.GetBool("help") {
