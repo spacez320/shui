@@ -1,5 +1,5 @@
 //
-// Laucnher for Shui.
+// Launcher for Shui.
 
 package shui
 
