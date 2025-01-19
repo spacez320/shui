@@ -14,6 +14,7 @@ import (
 
 	"github.com/spacez320/shui"
 	"github.com/spacez320/shui/internal/lib"
+	"github.com/spf13/pflag"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -105,6 +106,7 @@ func main() {
 	}
 
 	// Define arguments.
+	flag.Bool("help", false, "Show usage")
 	flag.Bool("history", viper.GetBool("history"), "Whether or not to use or preserve history.")
 	flag.Bool("show-help", viper.GetBool("show-help"), "Whether or not to show help displays.")
 	flag.Bool("show-logs", viper.GetBool("show-logs"), "Whether or not to show log displays.")
@@ -145,6 +147,12 @@ func main() {
 		"Labels to apply to query values, separated by commas.")
 	flag.Parse()
 	viper.BindPFlags(flag.CommandLine)
+
+	// Display usage.
+	if viper.GetBool("help") {
+		pflag.Usage()
+		os.Exit(0)
+	}
 
 	// Display a version.
 	if viper.GetBool("version") {
