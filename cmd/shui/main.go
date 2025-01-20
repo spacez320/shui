@@ -71,8 +71,9 @@ var (
 
 func main() {
 	var (
-		err           error  // General error holder.
-		userConfigDir string // User configuration directory.
+		err           error    // General error holder.
+		queries       []string // Queries to execute.
+		userConfigDir string   // User configuration directory.
 	)
 
 	// Retrieve the user config directory.
@@ -200,21 +201,33 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Detect if running from standard input.
+	// Determine queries to run. In order of preference, queries may come from stdin, flags, or
+	// configuration files, but may not combine from multiple sources.
 	f, err := os.Stdin.Stat()
 	if err != nil {
 		panic(err)
 	}
 	if f.Mode()&os.ModeNamedPipe != 0 {
-		// We are reading standard input.
+		// Queries are coming from standard input.
 		readStdin = true
-	} else {
-		// There is no standard input--queries are needed.
-		if len(viper.GetStringSlice("query")) == 0 {
-			flag.Usage()
-			fmt.Fprintf(os.Stderr, "Missing required argument --query\n")
-			os.Exit(1)
+	} else if pflag.Lookup("query").Changed {
+		// Queries were provided as flags.
+		queries = viper.GetStringSlice("query")
+
+		// Warn if providing queries are also present in the configuration file.
+		if viper.InConfig("query") {
+			slog.Warn("Queries are defined in both flags and configuration--using flags only")
 		}
+	} else if viper.InConfig("query") {
+		// Queries are provided in the configuration file.
+		for _, query := range viper.Get("query").([]interface{}) {
+			queries = append(queries, query.(map[string]interface{})["command"].(string))
+		}
+	} else {
+		// No queries were provided.
+		flag.Usage()
+		fmt.Fprintf(os.Stderr, "At least one query must be defined\n")
+		os.Exit(1)
 	}
 
 	// Set-up logging.
@@ -260,7 +273,7 @@ func main() {
 		Port:                   viper.GetInt("port"),
 		PrometheusExporterAddr: viper.GetString("prometheus-exporter"),
 		PushgatewayAddr:        viper.GetString("prometheus-pushgateway"),
-		Queries:                viper.GetStringSlice("query"),
+		Queries:                queries,
 		ReadStdin:              readStdin,
 	}
 
