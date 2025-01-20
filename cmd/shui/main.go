@@ -29,8 +29,8 @@ type buildInfo struct {
 
 // Misc. constants.
 const (
-	CONFIG_FILE_DIR  = "shui"      // Directory for Shui configuration.
-	CONFIG_FILE_NAME = "shui.toml" // Shui configuration file.
+	DEFAULT_CONFIG_FILE_DIR  = "shui"      // Directory for Shui configuration.
+	DEFAULT_CONFIG_FILE_NAME = "shui.toml" // Shui configuration file.
 )
 
 var (
@@ -128,6 +128,10 @@ func main() {
 	flag.Int("outer-padding-right", viper.GetInt("outer-padding-right"), "Right display padding.")
 	flag.Int("outer-padding-top", viper.GetInt("outer-padding-top"), "Top display padding.")
 	flag.Int("rpc-port", viper.GetInt("rpc-port"), "Port for RPC.")
+	flag.String(
+		"config",
+		filepath.Join(userConfigDir, DEFAULT_CONFIG_FILE_DIR, DEFAULT_CONFIG_FILE_NAME),
+		"Config file to use")
 	flag.String("elasticsearch-addr", viper.GetString("elasticsearch-addr"),
 		"Address to present Elasticsearch document updates.")
 	flag.String("elasticsearch-index", viper.GetString("elasticsearch-index"),
@@ -154,7 +158,8 @@ func main() {
 	flag.Parse()
 
 	// Define configuration sources.
-	viper.SetConfigFile(filepath.Join(userConfigDir, CONFIG_FILE_DIR, CONFIG_FILE_NAME))
+	viper.BindPFlags(flag.CommandLine)
+	viper.SetConfigFile(viper.GetString("config"))
 	err = viper.ReadInConfig()
 	if err != nil {
 		// Exclude errors that indicate a missing configuration file.
@@ -167,7 +172,6 @@ func main() {
 			slog.Warn(err.Error())
 		}
 	}
-	viper.BindPFlags(flag.CommandLine)
 
 	// Manage configuration aliases.
 	for k, v := range configurationAliases {
