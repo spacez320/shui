@@ -1,0 +1,52 @@
+#
+# Sample configuration file for Shui that reads CPU load averages.
+
+count = -1
+display = 4
+history = false
+log-level = "debug"
+
+filters = [
+  "CPU load average"
+]
+
+labels = [
+  "CPU load average"
+]
+
+expressions = [
+  "get(result, 'CPU load average') * 100"
+]
+
+[tui.padding]
+bottom = 0
+top = 0
+left = 0
+right = 0
+
+[tui.show]
+help = true
+logs = true
+status = true
+
+# 1 minute CPU load average
+[[query]]
+command = "uptime | awk '{print $10}' | tr -d ','"
+
+# 5 minute CPU load average
+[[query]]
+command = "uptime | awk '{print $11}' | tr -d ','"
+
+# 15 minute CPU load average
+[[query]]
+command = "uptime | awk '{print $12}' | tr -d ','"
+
+# [elasticsearch]
+# addr = "https://localhost:9200"
+# index = "shui"
+# password = ""
+# user = "elastic"
+
+# [prometheus]
+# exporter = "127.0.0.1:9898"
+# pushgateway = "127.0.0.1:9091"

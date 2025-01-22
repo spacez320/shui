@@ -62,7 +62,7 @@ func TestCLI(t *testing.T) {
 		testName string
 		cliArgs  []string
 	}{
-		{"help", []string{"-h"}},
+		{"help", []string{"--help"}},
 	}
 
 	for _, cliTest := range cliTests {

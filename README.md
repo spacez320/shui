@@ -72,24 +72,24 @@ These examples show basic usage.
 
 ```sh
 # See help.
-shui -h
+shui --help
 
 # Execute `whoami` once, printing results to the console and waiting for a user to `^C`.
-shui -query 'whoami'
+shui --query 'whoami'
 
 # Execute `uptime` continuously, printing results to the console, without using persistence.
 shui \
-    -count -1 \
-    -history=false \
-    -query 'uptime'
+    --count -1 \
+    --history=false \
+    --query 'uptime'
 
 # Get the size of an NVME disk's used space and output it to a table with the specific label "NVME
 # Used Space".
 shui \
-    -count -1 \
-    -display 3 \
-    -labels "NVME Used Space" \
-    -query 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\'''
+    --count -1 \
+    --display 3 \
+    --labels "NVME Used Space" \
+    --query 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\'''
 ```
 
 You can also execute Shui from standard input, which works like query mode.
@@ -97,6 +97,60 @@ You can also execute Shui from standard input, which works like query mode.
 ```sh
 while true; do uptime; sleep 1; done | shui
 ```
+
+### Configuration
+
+Shui can accept instruction from flags or from a configuration file. By default it will look for a
+`shui.toml` in the user's config directory (see: <https://pkg.go.dev/os#UserConfigDir>), but one may
+also be provided explicitly.
+
+```sh
+shui --config path/to/config  # Default is "${HOME}/.config/shui/shui.toml".
+```
+
+See [example/shui.toml](example/shui.toml) for an example.
+
+> NOTE: Most options may be mixed, but queries and expressions may only be supplied with either
+> flags or configuration and not both.
+
+### Persistence
+
+Shui, by default, will store results and load them when re-executing the same query.
+
+The only currently supported storage is local disk, located in the user's cache directory. See:
+<https://pkg.go.dev/os#UserCacheDir>.
+
+### Expressions
+
+Shui has the ability to execute "expressions" on query results in order to manipulate them
+before display (e.g. performing statistics, combining values, producing cumulative series, etc.).
+
+Some key points about expressions:
+
+- Multiple expressions may be provided and execute in the order provided.
+- Filters apply before expressions.
+- It uses [Expr, a Go-centric expression language](https://github.com/expr-lang/expr).
+- The expression language is type sensitive, but results of expressions will always be strings.
+
+Expressions are able to access variables:
+
+1.  `result`, a map of the current result's labels to values.
+2.  `prevResult`, the previous result mapping, for cumulative results. Note that expressions must
+    account for `prevResult` being an empty map for the first result in a series.
+
+Some examples:
+
+```sh
+# Multiply the 5m CPU average by 10. Note that we invoke `get` with a key of `"9"` because default
+# labels are string indexes and no labels were provided.
+shui --query 'uptime | tr -d ","' -expr 'get(result, "9") * 10'
+
+# Cumulatively sum 5m CPU average. Note that we need to account for prevResult being empty and we
+# must convert the prevResult from a string to a float.
+shui --query 'uptime | tr -d ","' -filters 9 -expr 'get(result, "0") + ("0" in prevResult? float(get(prevResult, "0")) : 0)'
+```
+
+See: <https://expr-lang.org/docs/language-definition>
 
 ### Integrations
 
@@ -109,21 +163,21 @@ Shui can create Elasticsearch documents from results.
 
 ```sh
 shui \
-    -elasticsearch-addr <addr> \
-    -elasticsearch-index <index> \
-    -elasticsearch-user <user> \
-    -elasticsearch-password <password
+    --elasticsearch-addr <addr> \
+    --elasticsearch-index <index> \
+    --elasticsearch-user <user> \
+    --elasticsearch-password <password
 ```
 
-- Documents are structured according to result labels supplied with `-labels`, prefixed with
+- Documents are structured according to result labels supplied with `--labels`, prefixed with
   `shui.value.`.
 - Documents will also contain an additional field, `shui.query`.
 - The result `Time` field will be mapped to `timestamp`.
-- Shui must use HTTP Basic Auth (credentials are given with `-elasticsearch-user` and
-  `-elasticsearch-password`).
-- Shui will not attempt to create an index (one must be supplied with `-elasticsearch-index`).
+- Shui must use HTTP Basic Auth (credentials are given with `--elasticsearch-user` and
+  `--elasticsearch-password`).
+- Shui will not attempt to create an index (one must be supplied with `--elasticsearch-index`).
 
-As an example, given a query `cat file.txt | wc` and `-labels "newline,words,bytes"`, the following
+As an example, given a query `cat file.txt | wc` and `--labels "newline,words,bytes"`, the following
 Elasticsearch document would be created:
 
 ```json
@@ -148,15 +202,15 @@ and Pushgateway are supported.
 
 ```sh
 # Start a Prometheus collection HTTP page.
-shui -prometheus-exporter <address>
+shui --prometheus-exporter <address>
 
 # Specify a Prometheus Pushgateway address to send results to.
-shui -prometheus-pushgateway <address>
+shui --prometheus-pushgateway <address>
 ```
 
 - Metrics namse will have the structure `shui_<query>` where `<query>` will be changed to
   conform to Prometheus naming rules.
-- Shui labels supplied with `-labels` will be saved as a Prometheus label called
+- Shui labels supplied with `--labels` will be saved as a Prometheus label called
   `shui_label`, creating a unique series for each value in a series of results.
 
 As an example, given a query `cat file.txt | wc`, and `-labels "newline,words,bytes"`, the following
@@ -170,45 +224,6 @@ shui_cat_file_txt_wc{shui_label="bytes"}
 
 > **NOTE:** The only currently supported metric is a **Gauge** and queries must provide something
 > numerical to be recorded.
-
-### Persistence
-
-Shui, by default, will store results and load them when re-executing the same query.
-
-The only currently supported storage is local disk, located in the user's cache directory. See:
-<https://pkg.go.dev/os#UserCacheDir>.
-
-### Expressions
-
-Shui has the ability to execute "expressions" on query results in order to manipulate them
-before display (e.g. performing statistics, combining values, producing cumulative series, etc.).
-
-Some key points about expressions:
-
-- Multiple expressions may be provided and execute in the order provided.
-- Filters apply before expressions.
-- It uses Expr, a Go-centric expression language.
-- The expression language is type sensitive, but results of expressions will always be strings.
-
-Expressions are able to access variables:
-
-1.  `result`, a map of the current result's labels to values.
-2.  `prevResult`, the previous result mapping, for cumulative results. Note that expressions must
-    account for `prevResult` being an empty map for the first result in a series.
-
-Some examples:
-
-```sh
-# Multiply the 5m CPU average by 10. Note that we invoke `get` with a key of `"9"` because default
-# labels are string indexes and no labels were provided.
-shui -query 'uptime | tr -d ","' -expr 'get(result, "9") * 10'
-
-# Cumulatively sum 5m CPU average. Note that we need to account for prevResult being empty and we
-# must convert the prevResult from a string to a float.
-shui -query 'uptime | tr -d ","' -filters 9 -expr 'get(result, "0") + ("0" in prevResult? float(get(prevResult, "0")) : 0)'
-```
-
-See: <https://expr-lang.org/docs/language-definition>
 
 Future
 ------
