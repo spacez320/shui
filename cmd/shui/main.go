@@ -72,6 +72,7 @@ var (
 func main() {
 	var (
 		err           error    // General error holder.
+		expressions   []string // Expressions to apply to query results.
 		queries       []string // Queries to execute.
 		userConfigDir string   // User configuration directory.
 	)
@@ -234,6 +235,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Determine expressions to use. In order of preference, expressions may come from flags or
+	// configuration files, but may not combine from multiple sources. This is mostly to mirror what
+	// queries are doing.
+	if pflag.Lookup("expr").Changed {
+		expressions = viper.GetStringSlice("expr")
+	} else if viper.InConfig("expressions") {
+		expressions = viper.GetStringSlice("expressions")
+	}
+
 	// Set-up logging.
 	if viper.GetBool("silent") {
 		// Silence all output.
@@ -267,7 +277,7 @@ func main() {
 		ElasticsearchIndex:     viper.GetString("elasticsearch-index"),
 		ElasticsearchPassword:  viper.GetString("elasticsearch-password"),
 		ElasticsearchUser:      viper.GetString("elasticsearch-user"),
-		Expressions:            viper.GetStringSlice("expr"),
+		Expressions:            expressions,
 		Filters:                viper.GetStringSlice("filters"),
 		History:                viper.GetBool("history"),
 		Labels:                 viper.GetStringSlice("labels"),
