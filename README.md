@@ -98,6 +98,21 @@ You can also execute Shui from standard input, which works like query mode.
 while true; do uptime; sleep 1; done | shui
 ```
 
+### Configuration
+
+Shui can accept instruction from flags or from a configuration file. By default it will look for a
+`shui.toml` in the user's config directory (see: <https://pkg.go.dev/os#UserConfigDir>), but one may
+also be provided explicitly.
+
+```sh
+shui --config path/to/config  # Default is "${HOME}/.config/shui/shui.toml".
+```
+
+See [example/shui.toml](example/shui.toml) for an example.
+
+> NOTE: Most options may be mixed, but queries and expressions may only be supplied with either
+> flags or configuration and not both.
+
 ### Persistence
 
 Shui, by default, will store results and load them when re-executing the same query.
@@ -114,7 +129,7 @@ Some key points about expressions:
 
 - Multiple expressions may be provided and execute in the order provided.
 - Filters apply before expressions.
-- It uses Expr, a Go-centric expression language.
+- It uses [Expr, a Go-centric expression language](https://github.com/expr-lang/expr).
 - The expression language is type sensitive, but results of expressions will always be strings.
 
 Expressions are able to access variables:

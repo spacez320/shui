@@ -45,19 +45,19 @@ var (
 	// Aliases to apply for configuration settings, mainly to account for differences between flags
 	// (the left column) and configuration files (the right column).
 	configurationAliases = map[string]string{
-		"elasticsearch-addr":     "elasticsearch.addr",
-		"elasticsearch-index":    "elasticsearch.index",
-		"elasticsearch-password": "elasticsearch.password",
-		"elasticsearch-user":     "elasticsearch.user",
-		"outer-padding-bottom":   "tui.padding.bottom",
-		"outer-padding-left":     "tui.padding.left",
-		"outer-padding-right":    "tui.padding.right",
-		"outer-padding-top":      "tui.padding.top",
-		"prometheus-exporter":    "prometheus.exporter",
-		"prometheus-pushgateway": "prometheus.pushgateway",
-		"show-help":              "tui.show.help",
-		"show-logs":              "tui.show.logs",
-		"show-status":            "tui.show.status",
+		"elasticsearch.addr":     "elasticsearch-addr",
+		"elasticsearch.index":    "elasticsearch-index",
+		"elasticsearch.password": "elasticsearch-password",
+		"elasticsearch.user":     "elasticsearch-user",
+		"tui.padding.bottom":     "outer-padding-bottom",
+		"tui.padding.left":       "outer-padding-left",
+		"tui.padding.right":      "outer-padding-right",
+		"tui.padding.top":        "outer-padding-top",
+		"prometheus.exporter":    "prometheus-exporter",
+		"prometheus.pushgateway": "prometheus-pushgateway",
+		"tui.show.help":          "show-help",
+		"tui.show.logs":          "show-logs",
+		"tui.show.status":        "show-status",
 	}
 
 	logger                 = log.Default() // Logging system.
