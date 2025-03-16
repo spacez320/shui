@@ -79,7 +79,7 @@ var (
 
 	// Mapping of display mode constants to a common display mode name.
 	DisplayModes = map[DisplayMode]string{
-		DISPLAY_MODE_RAW:    "raw",
+		DISPLAY_MODE_RAW:    "raw", // First to serve as the 'default.'
 		DISPLAY_MODE_STREAM: "stream",
 		DISPLAY_MODE_TABLE:  "table",
 		DISPLAY_MODE_GRAPH:  "graph",

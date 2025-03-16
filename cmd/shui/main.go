@@ -42,7 +42,7 @@ func (d *DisplayModeArg) Set(v string) error {
 	return err
 }
 
-func (d DisplayModeArg) Type() string {
+func (d *DisplayModeArg) Type() string {
 	return "display"
 }
 
@@ -60,7 +60,7 @@ func (q *QueryModeArg) Set(v string) error {
 	return err
 }
 
-func (q QueryModeArg) Type() string {
+func (q *QueryModeArg) Type() string {
 	return "mode"
 }
 
