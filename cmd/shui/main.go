@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/pflag"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 )
 
 // Used to supply build information.
@@ -27,7 +28,42 @@ type buildInfo struct {
 	version   string
 }
 
-// Misc. constants.
+type DisplayModeArg struct {
+	displayMode lib.DisplayMode
+}
+
+func (d *DisplayModeArg) String() string {
+	return d.displayMode.String()
+}
+
+func (d *DisplayModeArg) Set(v string) error {
+	dVal, err := lib.DisplayModeFromString(v)
+	d.displayMode = dVal
+	return err
+}
+
+func (d *DisplayModeArg) Type() string {
+	return "display"
+}
+
+type QueryModeArg struct {
+	queryMode shui.QueryMode
+}
+
+func (q *QueryModeArg) String() string {
+	return q.queryMode.String()
+}
+
+func (q *QueryModeArg) Set(v string) error {
+	qVal, err := shui.QueryModeFromString(v)
+	q.queryMode = qVal
+	return err
+}
+
+func (q *QueryModeArg) Type() string {
+	return "mode"
+}
+
 const (
 	DEFAULT_CONFIG_FILE_DIR  = "shui"      // Directory for Shui configuration.
 	DEFAULT_CONFIG_FILE_NAME = "shui.toml" // Shui configuration file.
@@ -38,9 +74,7 @@ var (
 	readStdin bool
 
 	// Supplied by the linker at build time.
-	version string
-	commit  string
-	date    string
+	date, commit, version string
 
 	// Aliases to apply for configuration settings, mainly to account for differences between flags
 	// (the left column) and configuration files (the right column).
@@ -71,10 +105,12 @@ var (
 
 func main() {
 	var (
-		err           error    // General error holder.
-		expressions   []string // Expressions to apply to query results.
-		queries       []string // Queries to execute.
-		userConfigDir string   // User configuration directory.
+		display       DisplayModeArg // Display mode to use for results.
+		err           error          // General error holder.
+		expressions   []string       // Expressions to apply to query results.
+		mode          QueryModeArg   // Mode to execute under.
+		queries       []string       // Queries to execute.
+		userConfigDir string         // User configuration directory.
 	)
 
 	// Retrieve the user config directory.
@@ -86,7 +122,7 @@ func main() {
 	// Define configuration defaults.
 	viper.SetDefault("count", 1)
 	viper.SetDefault("delay", 3)
-	viper.SetDefault("display", int(lib.DISPLAY_MODE_RAW))
+	viper.SetDefault("display", "raw")
 	viper.SetDefault("elasticsearch-addr", "")
 	viper.SetDefault("elasticsearch-index", "")
 	viper.SetDefault("elasticsearch-password", "")
@@ -97,7 +133,7 @@ func main() {
 	viper.SetDefault("labels", []string{})
 	viper.SetDefault("log-file", "")
 	viper.SetDefault("log-level", "error")
-	viper.SetDefault("mode", int(shui.MODE_QUERY))
+	viper.SetDefault("mode", "query")
 	viper.SetDefault("outer-padding-bottom", -1)
 	viper.SetDefault("outer-padding-left", -1)
 	viper.SetDefault("outer-padding-right", -1)
@@ -113,7 +149,7 @@ func main() {
 	viper.SetDefault("version", false)
 
 	// Define arguments.
-	flag.Bool("help", false, "Show usage")
+	flag.Bool("help", false, "Show usage.")
 	flag.Bool("history", viper.GetBool("history"), "Whether or not to use or preserve history.")
 	flag.Bool("show-help", viper.GetBool("show-help"), "Whether or not to show help displays.")
 	flag.Bool("show-logs", viper.GetBool("show-logs"), "Whether or not to show log displays.")
@@ -122,8 +158,6 @@ func main() {
 	flag.Bool("version", viper.GetBool("version"), "Show version.")
 	flag.Int("count", viper.GetInt("count"), "Number of query executions. -1 for continuous.")
 	flag.Int("delay", viper.GetInt("delay"), "Delay between queries (seconds).")
-	flag.Int("display", viper.GetInt("display"), "Result mode to display.")
-	flag.Int("mode", viper.GetInt("mode"), "Mode to execute in.")
 	flag.Int("outer-padding-bottom", viper.GetInt("outer-padding-bottom"), "Bottom display padding.")
 	flag.Int("outer-padding-left", viper.GetInt("outer-padding-left"), "Left display padding.")
 	flag.Int("outer-padding-right", viper.GetInt("outer-padding-right"), "Right display padding.")
@@ -156,6 +190,8 @@ func main() {
 	flag.StringSlice("filters", viper.GetStringSlice("filters"), "Results filters.")
 	flag.StringSlice("labels", viper.GetStringSlice("labels"),
 		"Labels to apply to query values, separated by commas.")
+	flag.Var(&display, "display", fmt.Sprintf("Result display mode to use (%s).", maps.Values(lib.DisplayModes)))
+	flag.Var(&mode, "mode", fmt.Sprintf("Mode to execute in (%s).", maps.Values(shui.QueryModes)))
 	flag.Parse()
 
 	// Define configuration sources.
@@ -272,7 +308,7 @@ func main() {
 	config := lib.Config{
 		Count:                  viper.GetInt("count"),
 		Delay:                  viper.GetInt("delay"),
-		DisplayMode:            viper.GetInt("display"),
+		DisplayMode:            int(display.displayMode),
 		ElasticsearchAddr:      viper.GetString("elasticsearch-addr"),
 		ElasticsearchIndex:     viper.GetString("elasticsearch-index"),
 		ElasticsearchPassword:  viper.GetString("elasticsearch-password"),
@@ -283,7 +319,7 @@ func main() {
 		Labels:                 viper.GetStringSlice("labels"),
 		LogLevel:               viper.GetString("log-level"),
 		LogMulti:               viper.GetString("log-file") != "",
-		Mode:                   viper.GetInt("mode"),
+		Mode:                   int(mode.queryMode),
 		Port:                   viper.GetInt("port"),
 		PrometheusExporterAddr: viper.GetString("prometheus-exporter"),
 		PushgatewayAddr:        viper.GetString("prometheus-pushgateway"),
