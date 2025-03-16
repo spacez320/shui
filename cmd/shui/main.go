@@ -149,7 +149,7 @@ func main() {
 	viper.SetDefault("version", false)
 
 	// Define arguments.
-	flag.Bool("help", false, "Show usage")
+	flag.Bool("help", false, "Show usage.")
 	flag.Bool("history", viper.GetBool("history"), "Whether or not to use or preserve history.")
 	flag.Bool("show-help", viper.GetBool("show-help"), "Whether or not to show help displays.")
 	flag.Bool("show-logs", viper.GetBool("show-logs"), "Whether or not to show log displays.")
