@@ -4,6 +4,7 @@
 package lib
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -30,19 +31,24 @@ type DisplayDriver int
 // Represents the display mode.
 type DisplayMode int
 
+// Fetches a common name from the display mode value.
+func (d *DisplayMode) String() string {
+	return DisplayModes[*d]
+}
+
 // Display driver constants. Each display mode uses a specific display driver.
 const (
-	DISPLAY_RAW      DisplayDriver = iota + 1 // Used for direct output.
-	DISPLAY_TVIEW                             // Used when tview is the TUI driver.
-	DISPLAY_TERMDASH                          // Used when termdash is the TUI driver.
+	DISPLAY_RAW      DisplayDriver = iota // Used for direct output.
+	DISPLAY_TVIEW                         // Used when tview is the TUI driver.
+	DISPLAY_TERMDASH                      // Used when termdash is the TUI driver.
 )
 
 // Display mode constants.
 const (
-	DISPLAY_MODE_RAW    DisplayMode = iota + 1 // For running in 'raw' display mode.
-	DISPLAY_MODE_STREAM                        // For running in 'stream' display mode.
-	DISPLAY_MODE_TABLE                         // For running in 'table' display mode.
-	DISPLAY_MODE_GRAPH                         // For running in 'graph' display mode.
+	DISPLAY_MODE_RAW    DisplayMode = iota // For running in 'raw' display mode.
+	DISPLAY_MODE_STREAM                    // For running in 'stream' display mode.
+	DISPLAY_MODE_TABLE                     // For running in 'table' display mode.
+	DISPLAY_MODE_GRAPH                     // For running in 'graph' display mode.
 )
 
 // Defaults for display configs.
@@ -70,6 +76,14 @@ var (
 		DISPLAY_MODE_GRAPH,
 	} // Display modes considered for use in the current session.
 	interruptChan = make(chan bool) // Channel for interrupting displays.
+
+	// Mapping of display mode constants to a common display mode name.
+	DisplayModes = map[DisplayMode]string{
+		DISPLAY_MODE_RAW:    "raw",
+		DISPLAY_MODE_STREAM: "stream",
+		DISPLAY_MODE_TABLE:  "table",
+		DISPLAY_MODE_GRAPH:  "graph",
+	}
 )
 
 // Starts the display. Applies contextual logic depending on the provided display driver. Expects a
@@ -92,6 +106,17 @@ func display(driver DisplayDriver, displayUpdateFunc func()) {
 // Clean-up display logic when fully quitting.
 func displayQuit() {
 	close(interruptChan)
+}
+
+// Fetches a display mode value from its common name.
+func DisplayModeFromString(s string) (DisplayMode, error) {
+	for k, v := range DisplayModes {
+		if s == v {
+			return k, nil
+		}
+	}
+
+	return 0, errors.New(fmt.Sprintf("Unknown display mode %s", s))
 }
 
 // Creates a default display config.

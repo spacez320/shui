@@ -18,7 +18,7 @@ type QueryMode int
 
 // Fetches a common name from a query mode value.
 func (q *QueryMode) String() string {
-	return Modes[*q]
+	return QueryModes[*q]
 }
 
 // Mode constants.
@@ -37,7 +37,7 @@ var (
 	ctx = context.Background() // Initialize context.
 
 	// Mapping of mode constants to a common mode name.
-	Modes = map[QueryMode]string{
+	QueryModes = map[QueryMode]string{
 		MODE_PROFILE: "profile",
 		MODE_QUERY:   "query",
 		MODE_READ:    "read",
@@ -46,7 +46,7 @@ var (
 
 // Fetches a query mode value from its common name.
 func QueryModeFromString(s string) (QueryMode, error) {
-	for k, v := range Modes {
+	for k, v := range QueryModes {
 		if s == v {
 			return k, nil
 		}

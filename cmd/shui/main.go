@@ -28,6 +28,24 @@ type buildInfo struct {
 	version   string
 }
 
+type DisplayModeArg struct {
+	displayMode lib.DisplayMode
+}
+
+func (d *DisplayModeArg) String() string {
+	return d.displayMode.String()
+}
+
+func (d *DisplayModeArg) Set(v string) error {
+	dVal, err := lib.DisplayModeFromString(v)
+	d.displayMode = dVal
+	return err
+}
+
+func (d DisplayModeArg) Type() string {
+	return "display"
+}
+
 type QueryModeArg struct {
 	queryMode shui.QueryMode
 }
@@ -87,11 +105,12 @@ var (
 
 func main() {
 	var (
-		err           error        // General error holder.
-		expressions   []string     // Expressions to apply to query results.
-		mode          QueryModeArg // Mode to execute under.
-		queries       []string     // Queries to execute.
-		userConfigDir string       // User configuration directory.
+		display       DisplayModeArg // Display mode to use for results.
+		err           error          // General error holder.
+		expressions   []string       // Expressions to apply to query results.
+		mode          QueryModeArg   // Mode to execute under.
+		queries       []string       // Queries to execute.
+		userConfigDir string         // User configuration directory.
 	)
 
 	// Retrieve the user config directory.
@@ -103,7 +122,7 @@ func main() {
 	// Define configuration defaults.
 	viper.SetDefault("count", 1)
 	viper.SetDefault("delay", 3)
-	viper.SetDefault("display", int(lib.DISPLAY_MODE_RAW))
+	viper.SetDefault("display", "raw")
 	viper.SetDefault("elasticsearch-addr", "")
 	viper.SetDefault("elasticsearch-index", "")
 	viper.SetDefault("elasticsearch-password", "")
@@ -139,7 +158,6 @@ func main() {
 	flag.Bool("version", viper.GetBool("version"), "Show version.")
 	flag.Int("count", viper.GetInt("count"), "Number of query executions. -1 for continuous.")
 	flag.Int("delay", viper.GetInt("delay"), "Delay between queries (seconds).")
-	flag.Int("display", viper.GetInt("display"), "Result mode to display.")
 	flag.Int("outer-padding-bottom", viper.GetInt("outer-padding-bottom"), "Bottom display padding.")
 	flag.Int("outer-padding-left", viper.GetInt("outer-padding-left"), "Left display padding.")
 	flag.Int("outer-padding-right", viper.GetInt("outer-padding-right"), "Right display padding.")
@@ -172,7 +190,8 @@ func main() {
 	flag.StringSlice("filters", viper.GetStringSlice("filters"), "Results filters.")
 	flag.StringSlice("labels", viper.GetStringSlice("labels"),
 		"Labels to apply to query values, separated by commas.")
-	flag.Var(&mode, "mode", fmt.Sprintf("Mode to execute in (%s).", maps.Values(shui.Modes)))
+	flag.Var(&display, "display", fmt.Sprintf("Result display mode to use (%s).", maps.Values(lib.DisplayModes)))
+	flag.Var(&mode, "mode", fmt.Sprintf("Mode to execute in (%s).", maps.Values(shui.QueryModes)))
 	flag.Parse()
 
 	// Define configuration sources.
@@ -289,7 +308,7 @@ func main() {
 	config := lib.Config{
 		Count:                  viper.GetInt("count"),
 		Delay:                  viper.GetInt("delay"),
-		DisplayMode:            viper.GetInt("display"),
+		DisplayMode:            int(display.displayMode),
 		ElasticsearchAddr:      viper.GetString("elasticsearch-addr"),
 		ElasticsearchIndex:     viper.GetString("elasticsearch-index"),
 		ElasticsearchPassword:  viper.GetString("elasticsearch-password"),
