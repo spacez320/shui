@@ -5,6 +5,7 @@ package shui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,22 +14,46 @@ import (
 )
 
 // Represents the mode value.
-type queryMode int
+type QueryMode int
+
+// Fetches a common name from a query mode value.
+func (q *QueryMode) String() string {
+	return Modes[*q]
+}
 
 // Mode constants.
 const (
-	MODE_QUERY   queryMode = iota + 1 // For running in 'query' mode.
-	MODE_PROFILE                      // For running in 'profile' mode.
-	MODE_READ                         // For running in 'read' mode.
+	MODE_QUERY   QueryMode = iota // For running in 'query' mode. First to serve as the 'default.'
+	MODE_PROFILE                  // For running in 'profile' mode.
+	MODE_READ                     // For running in 'read' mode.
 )
 
+// Misc. constants.
 const (
 	STDIN_QUERY_NAME = "stdin" // Named query value for reading stdin.
 )
 
 var (
 	ctx = context.Background() // Initialize context.
+
+	// Mapping of mode constants to a common mode name.
+	Modes = map[QueryMode]string{
+		MODE_PROFILE: "profile",
+		MODE_QUERY:   "query",
+		MODE_READ:    "read",
+	}
 )
+
+// Fetches a query mode value from its common name.
+func QueryModeFromString(s string) (QueryMode, error) {
+	for k, v := range Modes {
+		if s == v {
+			return k, nil
+		}
+	}
+
+	return 0, errors.New(fmt.Sprintf("Unknown query mode %s", s))
+}
 
 // Executes a Shui.
 func Run(config lib.Config, displayConfig lib.DisplayConfig) {
