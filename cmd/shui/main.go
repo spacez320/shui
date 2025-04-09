@@ -122,6 +122,7 @@ func main() {
 	// Define configuration defaults.
 	viper.SetDefault("count", 1)
 	viper.SetDefault("delay", 3)
+	viper.SetDefault("disable-config", false)
 	viper.SetDefault("display", "raw")
 	viper.SetDefault("elasticsearch-addr", "")
 	viper.SetDefault("elasticsearch-index", "")
@@ -149,6 +150,10 @@ func main() {
 	viper.SetDefault("version", false)
 
 	// Define arguments.
+	flag.Bool(
+		"disable-config",
+		viper.GetBool("disable-config"),
+		"Disable config loading, even if \"config\" is provided.")
 	flag.Bool("help", false, "Show usage.")
 	flag.Bool("history", viper.GetBool("history"), "Whether or not to use or preserve history.")
 	flag.Bool("show-help", viper.GetBool("show-help"), "Whether or not to show help displays.")
@@ -196,17 +201,21 @@ func main() {
 
 	// Define configuration sources.
 	viper.BindPFlags(flag.CommandLine)
-	viper.SetConfigFile(viper.GetString("config"))
-	err = viper.ReadInConfig()
-	if err != nil {
-		// Exclude errors that indicate a missing configuration file.
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			// FIXME There is currently a bug preventing Viper from ever returning
-			// `ConfigFileNotFoundError`. For now, skip over any configuration file errors.
-			//
-			// See: https://github.com/spf13/viper/issues/1783
-			// panic(err)
-			slog.Warn(err.Error())
+
+	// Load a configuration file.
+	if !viper.GetBool("disable-config") {
+		viper.SetConfigFile(viper.GetString("config"))
+		err = viper.ReadInConfig()
+		if err != nil {
+			// Exclude errors that indicate a missing configuration file.
+			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+				// FIXME There is currently a bug preventing Viper from ever returning
+				// `ConfigFileNotFoundError`. For now, skip over any configuration file errors.
+				//
+				// See: https://github.com/spf13/viper/issues/1783
+				// panic(err)
+				slog.Warn(err.Error())
+			}
 		}
 	}
 
