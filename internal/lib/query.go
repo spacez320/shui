@@ -98,13 +98,21 @@ func runQueryExec(query string, history bool) bool {
 
 // Executes a query as a process to profile.
 func runQueryProfile(pid string, history bool) bool {
+	var success = true
+
 	slog.Debug("Profiling pid", "pid", pid)
 
 	pidInt, err := strconv.Atoi(pid)
 	e(err)
-	AddResult(pid, runProfile(pidInt), history)
 
-	return true
+	if _, err := os.FindProcess(pidInt); err != nil {
+		AddResult(pid, runProfile(pidInt), history)
+	} else {
+		slog.Error("Pid not found", "pid", pid)
+		success = false
+	}
+
+	return success
 }
 
 // Reads standard input for results.
