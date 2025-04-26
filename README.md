@@ -90,11 +90,8 @@ shui \
     --display 3 \
     --labels "NVME Used Space" \
     --query 'df -h | grep nvme0n1p2 | awk '\''{print $3}'\'''
-```
 
-You can also execute Shui from standard input, which works like query mode.
-
-```sh
+# You can also execute Shui from standard input, which works like query mode.
 while true; do uptime; sleep 1; done | shui
 ```
 
@@ -113,7 +110,37 @@ See [example/shui.toml](example/shui.toml) for an example.
 > NOTE: Most options may be mixed, but queries and expressions may only be supplied with either
 > flags or configuration and not both.
 
-### Persistence
+### Manipulating Results
+
+There are ways to play with the results of queries.
+
+- **Labels** are ways to name a stream of data. Query outputs are expected to be space delimited
+  information, like a log. Labels allow keyword indexing of these results, creating an untyped
+  schema. By default, information will be labelled with numeric indexes.
+
+- **Filters** allow output to be selected for specific labels. This is necessary for some display
+  modes.
+
+- **Expressions** allow transformation of results based on a expression statement. This is
+  [explained more below](#expressions).
+
+Queries act as delimiters for these arguments. For example;
+
+```sh
+shui \
+    # Labels, filters, and expressions below only apply to this query.
+    --query 'uptime | awk '\''{print $10 $11 $12}'\'' | tr "," " "' \
+    --filters "5m,10m" \
+    --labels "5m,10m,15m" \
+    --expr 'mean([get(result, "5m"), get(result, "10m")])' \
+
+    # Futher labels, filters, and expressions apply to the next query.
+    --query 'whoami' \
+    --labels "Me" \
+    --expr 'upper(get(result, "Me"))'
+```
+
+### Presisting Results
 
 Shui, by default, will store results and load them when re-executing the same query.
 
@@ -143,11 +170,11 @@ Some examples:
 ```sh
 # Multiply the 5m CPU average by 10. Note that we invoke `get` with a key of `"9"` because default
 # labels are string indexes and no labels were provided.
-shui --query 'uptime | tr -d ","' -expr 'get(result, "9") * 10'
+shui --query 'uptime | tr -d ","' --expr 'get(result, "9") * 10'
 
 # Cumulatively sum 5m CPU average. Note that we need to account for prevResult being empty and we
 # must convert the prevResult from a string to a float.
-shui --query 'uptime | tr -d ","' -filters 9 -expr 'get(result, "0") + ("0" in prevResult? float(get(prevResult, "0")) : 0)'
+shui --query 'uptime | tr -d ","' --filters 9 -expr 'get(result, "0") + ("0" in prevResult? float(get(prevResult, "0")) : 0)'
 ```
 
 See: <https://expr-lang.org/docs/language-definition>
@@ -165,8 +192,8 @@ Shui can create Elasticsearch documents from results.
 shui \
     --elasticsearch-addr <addr> \
     --elasticsearch-index <index> \
-    --elasticsearch-user <user> \
-    --elasticsearch-password <password
+    --elasticsearch-password <password \
+    --elasticsearch-user <user>
 ```
 
 - Documents are structured according to result labels supplied with `--labels`, prefixed with
